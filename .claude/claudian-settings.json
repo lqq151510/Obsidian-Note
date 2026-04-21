@@ -1,7 +1,7 @@
 {
   "userName": "泽宝",
   "enableBlocklist": true,
-  "allowExternalAccess": false,
+  "allowExternalAccess": true,
   "blockedCommands": {
     "unix": [
       "rm -rf",
@@ -47,8 +47,8 @@
   "titleGenerationModel": "",
   "enableChrome": true,
   "enableBangBash": true,
-  "enableOpus1M": false,
-  "enableSonnet1M": false,
+  "enableOpus1M": true,
+  "enableSonnet1M": true,
   "excludedTags": [],
   "mediaFolder": "",
   "systemPrompt": "个人知识库助手",

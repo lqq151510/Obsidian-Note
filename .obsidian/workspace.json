@@ -235,6 +235,7 @@
   },
   "active": "2aad513004ac8412",
   "lastOpenFiles": [
+    "README.md",
     "AGENTS.md",
     "leecode/100题/数组/53. 最大子数组和.md",
     "leecode/100题/数组/56. 合并区间.md",
@@ -267,7 +268,6 @@
     "Java后端/Spring boot/2.控制器类.md",
     "leecode/100题/技巧",
     "Java后端/Spring boot/1.什么是Spring Boot.md",
-    "Java后端/elasticsearch/3.索引库.md",
     "未命名.base",
     "Claude Code",
     "大模型/springAI",

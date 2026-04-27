@@ -20,12 +20,21 @@ cd "$REPO_DIR"
 # Only stage superproject files, skip noisy nested plugin repo path.
 git add -A -- . ':(exclude).obsidian/plugins/claudian' || true
 
+committed=0
 if git diff --cached --quiet; then
   log "no staged changes, skip commit"
 else
   commit_msg="auto backup: $(date '+%Y-%m-%d %H:%M:%S')"
   git commit -m "$commit_msg"
   log "committed: $commit_msg"
+  committed=1
+fi
+
+# Skip push when there are no new commits and local branch is not ahead.
+ahead_count="$(git rev-list --count "$REMOTE/$BRANCH..$BRANCH" 2>/dev/null || echo 0)"
+if [ "$committed" -eq 0 ] && [ "$ahead_count" -eq 0 ]; then
+  log "no local commits to push, skip push"
+  exit 0
 fi
 
 # Push local history to remote; if remote has new commits, rebase then retry once.

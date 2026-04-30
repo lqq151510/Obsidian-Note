@@ -40,7 +40,7 @@
     ]
   },
   "permissionMode": "yolo",
-  "model": "deepseek-v4-flash",
+  "model": "haiku",
   "thinkingBudget": "off",
   "effortLevel": "max",
   "enableAutoTitleGeneration": true,
@@ -70,18 +70,11 @@
   "claudeCliPathsByHost": {},
   "loadUserClaudeSettings": true,
   "lastClaudeModel": "haiku",
-  "lastCustomModel": "deepseek-v4-flash",
+  "lastCustomModel": "",
   "lastEnvHash": "",
   "maxTabs": 5,
   "tabBarPosition": "input",
   "enableAutoScroll": true,
   "openInMainTab": false,
-  "hiddenSlashCommands": [],
-  "apiProvider": "openai",
-  "apiBaseUrl": "https://api.deepseek.com",
-  "apiKey": "sk-1387a7ec350e4cebab637a1c3875ae34",
-  "customModels": [
-    "deepseek-v4-flash",
-    "deepseek-v4-pro"
-  ]
+  "hiddenSlashCommands": []
 }

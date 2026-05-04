@@ -41,7 +41,7 @@
   },
   "permissionMode": "yolo",
   "model": "deepseek-v4-flash",
-  "thinkingBudget": "off",
+  "thinkingBudget": "low",
   "effortLevel": "max",
   "enableAutoTitleGeneration": true,
   "titleGenerationModel": "",

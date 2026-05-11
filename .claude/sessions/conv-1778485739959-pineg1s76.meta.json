@@ -1,0 +1,20 @@
+{
+  "id": "conv-1778485739959-pineg1s76",
+  "title": "Explain BST validation recursion",
+  "titleGenerationStatus": "success",
+  "createdAt": 1778485739959,
+  "updatedAt": 1778485760880,
+  "lastResponseAt": 1778485760880,
+  "sessionId": "51360bd3-5a23-45f8-a1a6-a08c6696e6f2",
+  "sdkSessionId": "51360bd3-5a23-45f8-a1a6-a08c6696e6f2",
+  "currentNote": "leecode/100题/树/98. 验证二叉搜索树.md",
+  "usage": {
+    "model": "deepseek-v4-flash",
+    "inputTokens": 737,
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 38016,
+    "contextWindow": 200000,
+    "contextTokens": 38753,
+    "percentage": 19
+  }
+}

@@ -212,7 +212,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 261.5
+    "width": 460.5
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -233,7 +233,7 @@
       "claudian:Open Claudian": false
     }
   },
-  "active": "2aad513004ac8412",
+  "active": "8b54df6d2960cde0",
   "lastOpenFiles": [
     "leecode/100题/树/108. 将有序数组转换为二叉搜索树.md",
     "leecode/100题/树/226. 翻转二叉树.md",

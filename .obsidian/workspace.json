@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "leecode/100题/图论/200. 岛屿数量.md",
+                "file": "leecode/100题/树/98. 验证二叉搜索树.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "200. 岛屿数量"
+              "title": "98. 验证二叉搜索树"
             }
           }
         ]
@@ -181,8 +181,8 @@
             "state": {
               "type": "git-view",
               "state": {},
-              "icon": "lucide-ghost",
-              "title": "git-view"
+              "icon": "git-pull-request",
+              "title": "Source Control"
             }
           },
           {
@@ -191,7 +191,7 @@
             "state": {
               "type": "footnotes",
               "state": {
-                "file": "Claude.md"
+                "file": "leecode/100题/树/98. 验证二叉搜索树.md"
               },
               "icon": "lucide-file-signature",
               "title": "脚注"
@@ -235,8 +235,9 @@
   },
   "active": "2aad513004ac8412",
   "lastOpenFiles": [
-    "leecode/100题/树/236. 二叉树的最近公共祖先.md",
+    "leecode/100题/图论/994. 腐烂的橘子.md",
     "leecode/100题/图论/200. 岛屿数量.md",
+    "leecode/100题/树/236. 二叉树的最近公共祖先.md",
     "leecode/100题/图论",
     "leecode/100题/树/437. 路径总和 III.md",
     "leecode/100题/树/105：从前序与中序遍历序列构造二叉树.md",
@@ -263,7 +264,6 @@
     "leecode/100题/滑动窗口",
     "leecode/100题/二分查找/33.搜索旋转排序数组.md",
     "leecode/100题/树/未命名.base",
-    "leecode/100题/双指针/42.接雨水.md",
     "leecode/100题/数组",
     "leecode/100题/数组/未命名",
     "leecode/100题/数组",

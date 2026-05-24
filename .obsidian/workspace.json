@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "leecode/100题/多维动态规划/62. 不同路径.md",
+                "file": "leecode/100题/多维动态规划/1143. 最长公共子序列.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "62. 不同路径"
+              "title": "1143. 最长公共子序列"
             }
           }
         ]
@@ -235,8 +235,11 @@
   },
   "active": "2aad513004ac8412",
   "lastOpenFiles": [
-    "leecode/100题/动态规划/32. 最长有效括号.md",
+    "leecode/100题/多维动态规划/5. 最长回文子串.md",
+    "leecode/100题/多维动态规划/1143. 最长公共子序列.md",
+    "leecode/100题/多维动态规划/64. 最小路径和.md",
     "leecode/100题/多维动态规划/62. 不同路径.md",
+    "leecode/100题/动态规划/32. 最长有效括号.md",
     "leecode/100题/多维动态规划",
     "leecode/100题/动态规划/416. 分割等和子集.md",
     "leecode/100题/动态规划/152. 乘积最大子数组.md",
@@ -261,9 +264,6 @@
     "leecode/100题/回溯/51. N 皇后**​.md",
     "leecode/100题/堆",
     "leecode/100题/回溯/131. 分割回文串.md",
-    "leecode/100题/回溯/79. 单词搜索.md",
-    "leecode/100题/回溯/22. 括号生成.md",
-    "leecode/100题/回溯/39. 组合总和**.md",
     "leecode/100题/回溯",
     "leecode/100题/矩阵",
     "leecode/100题/图论",

@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "leecode/100题/链表/23. 合并 K 个升序链表.md",
+                "file": "leecode/100题/树/124. 二叉树中的最大路径和.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "23. 合并 K 个升序链表"
+              "title": "124. 二叉树中的最大路径和"
             }
           }
         ]
@@ -235,8 +235,10 @@
   },
   "active": "2aad513004ac8412",
   "lastOpenFiles": [
-    "leecode/100题/链表/148. 排序链表.md",
+    "leecode/100题/链表/146. LRU 缓存.md",
+    "leecode/100题/树/124. 二叉树中的最大路径和.md",
     "leecode/100题/链表/23. 合并 K 个升序链表.md",
+    "leecode/100题/链表/148. 排序链表.md",
     "leecode/100题/链表/138. 随机链表的复制.md",
     "leecode/100题/链表/25. K 个一组翻转链表**.md",
     "leecode/100题/数组/41. 缺失的第一个正数.md",
@@ -263,8 +265,6 @@
     "leecode/100题/矩阵",
     "Markdown 文档.md",
     "Claude.md",
-    "AGENTS.md",
-    "Java后端/spring cloud/9.Sentinel.md",
     "leecode/100题/图论",
     "leecode/100题/滑动窗口",
     "leecode/100题/树/未命名.base",

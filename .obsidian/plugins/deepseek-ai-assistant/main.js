@@ -47,8 +47,6 @@ var DeepSeekAIAssistant_SettingTab = class extends import_obsidian.PluginSetting
     containerEl.createEl("h1", { text: "AI Assistant Models" });
     containerEl.createEl("p", { text: "Configure different AI models with their specific settings.", cls: "setting-item-description" });
     const models = this.plugin.settings.models || [];
-    if (!this.plugin.settings.models && this.plugin.settings.customModels) {
-    }
     models.forEach((model, index3) => {
       const setting = new import_obsidian.Setting(containerEl).setName(model.name).setDesc(document.createDocumentFragment());
       const desc = setting.descEl;
@@ -745,30 +743,30 @@ function isDirty(sub) {
   }
   return false;
 }
-function refreshComputed(computed4) {
-  if (computed4.flags & 4 && !(computed4.flags & 16)) {
+function refreshComputed(computed3) {
+  if (computed3.flags & 4 && !(computed3.flags & 16)) {
     return;
   }
-  computed4.flags &= -17;
-  if (computed4.globalVersion === globalVersion) {
+  computed3.flags &= -17;
+  if (computed3.globalVersion === globalVersion) {
     return;
   }
-  computed4.globalVersion = globalVersion;
-  if (!computed4.isSSR && computed4.flags & 128 && (!computed4.deps && !computed4._dirty || !isDirty(computed4))) {
+  computed3.globalVersion = globalVersion;
+  if (!computed3.isSSR && computed3.flags & 128 && (!computed3.deps && !computed3._dirty || !isDirty(computed3))) {
     return;
   }
-  computed4.flags |= 2;
-  const dep = computed4.dep;
+  computed3.flags |= 2;
+  const dep = computed3.dep;
   const prevSub = activeSub;
   const prevShouldTrack = shouldTrack;
-  activeSub = computed4;
+  activeSub = computed3;
   shouldTrack = true;
   try {
-    prepareDeps(computed4);
-    const value = computed4.fn(computed4._value);
-    if (dep.version === 0 || hasChanged(value, computed4._value)) {
-      computed4.flags |= 128;
-      computed4._value = value;
+    prepareDeps(computed3);
+    const value = computed3.fn(computed3._value);
+    if (dep.version === 0 || hasChanged(value, computed3._value)) {
+      computed3.flags |= 128;
+      computed3._value = value;
       dep.version++;
     }
   } catch (err) {
@@ -777,8 +775,8 @@ function refreshComputed(computed4) {
   } finally {
     activeSub = prevSub;
     shouldTrack = prevShouldTrack;
-    cleanupDeps(computed4);
-    computed4.flags &= -3;
+    cleanupDeps(computed3);
+    computed3.flags &= -3;
   }
 }
 function removeSub(link3, soft = false) {
@@ -852,8 +850,8 @@ var Link = class {
 };
 var Dep = class {
   // TODO isolatedDeclarations "__v_skip"
-  constructor(computed4) {
-    this.computed = computed4;
+  constructor(computed3) {
+    this.computed = computed3;
     this.version = 0;
     this.activeLink = void 0;
     this.subs = void 0;
@@ -945,10 +943,10 @@ var Dep = class {
 function addSub(link3) {
   link3.dep.sc++;
   if (link3.sub.flags & 4) {
-    const computed4 = link3.dep.computed;
-    if (computed4 && !link3.dep.subs) {
-      computed4.flags |= 4 | 16;
-      for (let l = computed4.deps; l; l = l.nextDep) {
+    const computed3 = link3.dep.computed;
+    if (computed3 && !link3.dep.subs) {
+      computed3.flags |= 4 | 16;
+      for (let l = computed3.deps; l; l = l.nextDep) {
         addSub(l);
       }
     }
@@ -2871,6 +2869,352 @@ function invokeDirectiveHook(vnode, prevVNode, instance, name) {
 }
 var TeleportEndKey = Symbol("_vte");
 var isTeleport = (type2) => type2.__isTeleport;
+var isTeleportDisabled = (props) => props && (props.disabled || props.disabled === "");
+var isTeleportDeferred = (props) => props && (props.defer || props.defer === "");
+var isTargetSVG = (target2) => typeof SVGElement !== "undefined" && target2 instanceof SVGElement;
+var isTargetMathML = (target2) => typeof MathMLElement === "function" && target2 instanceof MathMLElement;
+var resolveTarget = (props, select) => {
+  const targetSelector = props && props.to;
+  if (isString(targetSelector)) {
+    if (!select) {
+      warn$1(
+        `Current renderer does not support string target for Teleports. (missing querySelector renderer option)`
+      );
+      return null;
+    } else {
+      const target2 = select(targetSelector);
+      if (!target2 && !isTeleportDisabled(props)) {
+        warn$1(
+          `Failed to locate Teleport target with selector "${targetSelector}". Note the target element must exist before the component is mounted - i.e. the target cannot be rendered by the component itself, and ideally should be outside of the entire Vue component tree.`
+        );
+      }
+      return target2;
+    }
+  } else {
+    if (!targetSelector && !isTeleportDisabled(props)) {
+      warn$1(`Invalid Teleport target: ${targetSelector}`);
+    }
+    return targetSelector;
+  }
+};
+var TeleportImpl = {
+  name: "Teleport",
+  __isTeleport: true,
+  process(n1, n2, container, anchor, parentComponent, parentSuspense, namespace, slotScopeIds, optimized, internals) {
+    const {
+      mc: mountChildren,
+      pc: patchChildren,
+      pbc: patchBlockChildren,
+      o: { insert, querySelector, createText, createComment }
+    } = internals;
+    const disabled = isTeleportDisabled(n2.props);
+    let { shapeFlag, children: children2, dynamicChildren } = n2;
+    if (isHmrUpdating) {
+      optimized = false;
+      dynamicChildren = null;
+    }
+    if (n1 == null) {
+      const placeholder = n2.el = true ? createComment("teleport start") : createText("");
+      const mainAnchor = n2.anchor = true ? createComment("teleport end") : createText("");
+      insert(placeholder, container, anchor);
+      insert(mainAnchor, container, anchor);
+      const mount = (container2, anchor2) => {
+        if (shapeFlag & 16) {
+          if (parentComponent && parentComponent.isCE) {
+            parentComponent.ce._teleportTarget = container2;
+          }
+          mountChildren(
+            children2,
+            container2,
+            anchor2,
+            parentComponent,
+            parentSuspense,
+            namespace,
+            slotScopeIds,
+            optimized
+          );
+        }
+      };
+      const mountToTarget = () => {
+        const target2 = n2.target = resolveTarget(n2.props, querySelector);
+        const targetAnchor = prepareAnchor(target2, n2, createText, insert);
+        if (target2) {
+          if (namespace !== "svg" && isTargetSVG(target2)) {
+            namespace = "svg";
+          } else if (namespace !== "mathml" && isTargetMathML(target2)) {
+            namespace = "mathml";
+          }
+          if (!disabled) {
+            mount(target2, targetAnchor);
+            updateCssVars(n2, false);
+          }
+        } else if (!disabled) {
+          warn$1(
+            "Invalid Teleport target on mount:",
+            target2,
+            `(${typeof target2})`
+          );
+        }
+      };
+      if (disabled) {
+        mount(container, mainAnchor);
+        updateCssVars(n2, true);
+      }
+      if (isTeleportDeferred(n2.props)) {
+        n2.el.__isMounted = false;
+        queuePostRenderEffect(() => {
+          mountToTarget();
+          delete n2.el.__isMounted;
+        }, parentSuspense);
+      } else {
+        mountToTarget();
+      }
+    } else {
+      if (isTeleportDeferred(n2.props) && n1.el.__isMounted === false) {
+        queuePostRenderEffect(() => {
+          TeleportImpl.process(
+            n1,
+            n2,
+            container,
+            anchor,
+            parentComponent,
+            parentSuspense,
+            namespace,
+            slotScopeIds,
+            optimized,
+            internals
+          );
+        }, parentSuspense);
+        return;
+      }
+      n2.el = n1.el;
+      n2.targetStart = n1.targetStart;
+      const mainAnchor = n2.anchor = n1.anchor;
+      const target2 = n2.target = n1.target;
+      const targetAnchor = n2.targetAnchor = n1.targetAnchor;
+      const wasDisabled = isTeleportDisabled(n1.props);
+      const currentContainer = wasDisabled ? container : target2;
+      const currentAnchor = wasDisabled ? mainAnchor : targetAnchor;
+      if (namespace === "svg" || isTargetSVG(target2)) {
+        namespace = "svg";
+      } else if (namespace === "mathml" || isTargetMathML(target2)) {
+        namespace = "mathml";
+      }
+      if (dynamicChildren) {
+        patchBlockChildren(
+          n1.dynamicChildren,
+          dynamicChildren,
+          currentContainer,
+          parentComponent,
+          parentSuspense,
+          namespace,
+          slotScopeIds
+        );
+        traverseStaticChildren(n1, n2, false);
+      } else if (!optimized) {
+        patchChildren(
+          n1,
+          n2,
+          currentContainer,
+          currentAnchor,
+          parentComponent,
+          parentSuspense,
+          namespace,
+          slotScopeIds,
+          false
+        );
+      }
+      if (disabled) {
+        if (!wasDisabled) {
+          moveTeleport(
+            n2,
+            container,
+            mainAnchor,
+            internals,
+            1
+          );
+        } else {
+          if (n2.props && n1.props && n2.props.to !== n1.props.to) {
+            n2.props.to = n1.props.to;
+          }
+        }
+      } else {
+        if ((n2.props && n2.props.to) !== (n1.props && n1.props.to)) {
+          const nextTarget = n2.target = resolveTarget(
+            n2.props,
+            querySelector
+          );
+          if (nextTarget) {
+            moveTeleport(
+              n2,
+              nextTarget,
+              null,
+              internals,
+              0
+            );
+          } else if (true) {
+            warn$1(
+              "Invalid Teleport target on update:",
+              target2,
+              `(${typeof target2})`
+            );
+          }
+        } else if (wasDisabled) {
+          moveTeleport(
+            n2,
+            target2,
+            targetAnchor,
+            internals,
+            1
+          );
+        }
+      }
+      updateCssVars(n2, disabled);
+    }
+  },
+  remove(vnode, parentComponent, parentSuspense, { um: unmount, o: { remove: hostRemove } }, doRemove) {
+    const {
+      shapeFlag,
+      children: children2,
+      anchor,
+      targetStart,
+      targetAnchor,
+      target: target2,
+      props
+    } = vnode;
+    if (target2) {
+      hostRemove(targetStart);
+      hostRemove(targetAnchor);
+    }
+    doRemove && hostRemove(anchor);
+    if (shapeFlag & 16) {
+      const shouldRemove = doRemove || !isTeleportDisabled(props);
+      for (let i = 0; i < children2.length; i++) {
+        const child = children2[i];
+        unmount(
+          child,
+          parentComponent,
+          parentSuspense,
+          shouldRemove,
+          !!child.dynamicChildren
+        );
+      }
+    }
+  },
+  move: moveTeleport,
+  hydrate: hydrateTeleport
+};
+function moveTeleport(vnode, container, parentAnchor, { o: { insert }, m: move }, moveType = 2) {
+  if (moveType === 0) {
+    insert(vnode.targetAnchor, container, parentAnchor);
+  }
+  const { el, anchor, shapeFlag, children: children2, props } = vnode;
+  const isReorder = moveType === 2;
+  if (isReorder) {
+    insert(el, container, parentAnchor);
+  }
+  if (!isReorder || isTeleportDisabled(props)) {
+    if (shapeFlag & 16) {
+      for (let i = 0; i < children2.length; i++) {
+        move(
+          children2[i],
+          container,
+          parentAnchor,
+          2
+        );
+      }
+    }
+  }
+  if (isReorder) {
+    insert(anchor, container, parentAnchor);
+  }
+}
+function hydrateTeleport(node, vnode, parentComponent, parentSuspense, slotScopeIds, optimized, {
+  o: { nextSibling, parentNode, querySelector, insert, createText }
+}, hydrateChildren) {
+  const target2 = vnode.target = resolveTarget(
+    vnode.props,
+    querySelector
+  );
+  if (target2) {
+    const disabled = isTeleportDisabled(vnode.props);
+    const targetNode = target2._lpa || target2.firstChild;
+    if (vnode.shapeFlag & 16) {
+      if (disabled) {
+        vnode.anchor = hydrateChildren(
+          nextSibling(node),
+          vnode,
+          parentNode(node),
+          parentComponent,
+          parentSuspense,
+          slotScopeIds,
+          optimized
+        );
+        vnode.targetStart = targetNode;
+        vnode.targetAnchor = targetNode && nextSibling(targetNode);
+      } else {
+        vnode.anchor = nextSibling(node);
+        let targetAnchor = targetNode;
+        while (targetAnchor) {
+          if (targetAnchor && targetAnchor.nodeType === 8) {
+            if (targetAnchor.data === "teleport start anchor") {
+              vnode.targetStart = targetAnchor;
+            } else if (targetAnchor.data === "teleport anchor") {
+              vnode.targetAnchor = targetAnchor;
+              target2._lpa = vnode.targetAnchor && nextSibling(vnode.targetAnchor);
+              break;
+            }
+          }
+          targetAnchor = nextSibling(targetAnchor);
+        }
+        if (!vnode.targetAnchor) {
+          prepareAnchor(target2, vnode, createText, insert);
+        }
+        hydrateChildren(
+          targetNode && nextSibling(targetNode),
+          vnode,
+          target2,
+          parentComponent,
+          parentSuspense,
+          slotScopeIds,
+          optimized
+        );
+      }
+    }
+    updateCssVars(vnode, disabled);
+  }
+  return vnode.anchor && nextSibling(vnode.anchor);
+}
+var Teleport = TeleportImpl;
+function updateCssVars(vnode, isDisabled) {
+  const ctx = vnode.ctx;
+  if (ctx && ctx.ut) {
+    let node, anchor;
+    if (isDisabled) {
+      node = vnode.el;
+      anchor = vnode.anchor;
+    } else {
+      node = vnode.targetStart;
+      anchor = vnode.targetAnchor;
+    }
+    while (node && node !== anchor) {
+      if (node.nodeType === 1)
+        node.setAttribute("data-v-owner", ctx.uid);
+      node = node.nextSibling;
+    }
+    ctx.ut();
+  }
+}
+function prepareAnchor(target2, vnode, createText, insert) {
+  const targetStart = vnode.targetStart = createText("");
+  const targetAnchor = vnode.targetAnchor = createText("");
+  targetStart[TeleportEndKey] = targetAnchor;
+  if (target2) {
+    insert(targetStart, target2);
+    insert(targetAnchor, target2);
+  }
+  return targetAnchor;
+}
 var leaveCbKey = Symbol("_leaveCb");
 var enterCbKey = Symbol("_enterCb");
 function setTransitionHooks(vnode, hooks2) {
@@ -3432,7 +3776,7 @@ function applyOptions(instance) {
     beforeUnmount,
     destroyed,
     unmounted,
-    render: render7,
+    render: render8,
     renderTracked,
     renderTriggered,
     errorCaptured,
@@ -3587,8 +3931,8 @@ function applyOptions(instance) {
       instance.exposed = {};
     }
   }
-  if (render7 && instance.render === NOOP) {
-    instance.render = render7;
+  if (render8 && instance.render === NOOP) {
+    instance.render = render8;
   }
   if (inheritAttrs != null) {
     instance.inheritAttrs = inheritAttrs;
@@ -3836,7 +4180,7 @@ function createAppContext() {
   };
 }
 var uid$1 = 0;
-function createAppAPI(render7, hydrate) {
+function createAppAPI(render8, hydrate) {
   return function createApp2(rootComponent, rootProps = null) {
     if (!isFunction(rootComponent)) {
       rootComponent = extend({}, rootComponent);
@@ -3942,13 +4286,13 @@ function createAppAPI(render7, hydrate) {
             context.reload = () => {
               const cloned = cloneVNode(vnode);
               cloned.el = null;
-              render7(cloned, rootContainer, namespace);
+              render8(cloned, rootContainer, namespace);
             };
           }
           if (isHydrate && hydrate) {
             hydrate(vnode, rootContainer);
           } else {
-            render7(vnode, rootContainer, namespace);
+            render8(vnode, rootContainer, namespace);
           }
           isMounted = true;
           app._container = rootContainer;
@@ -3980,7 +4324,7 @@ If you want to remount the same app, move your app creation logic into a factory
             app._instance,
             16
           );
-          render7(null, app._container);
+          render8(null, app._container);
           if (true) {
             app._instance = null;
             devtoolsUnmountApp(app);
@@ -6011,7 +6355,7 @@ function baseCreateRenderer(options, createHydrationFns) {
     return teleportEnd ? hostNextSibling(teleportEnd) : el;
   };
   let isFlushing = false;
-  const render7 = (vnode, container, namespace) => {
+  const render8 = (vnode, container, namespace) => {
     if (vnode == null) {
       if (container._vnode) {
         unmount(container._vnode, null, null, true);
@@ -6055,9 +6399,9 @@ function baseCreateRenderer(options, createHydrationFns) {
     );
   }
   return {
-    render: render7,
+    render: render8,
     hydrate,
-    createApp: createAppAPI(render7, hydrate)
+    createApp: createAppAPI(render8, hydrate)
   };
 }
 function resolveChildrenNamespace({ type: type2, props }, currentNamespace) {
@@ -6436,7 +6780,7 @@ function renderComponentRoot(instance) {
     slots,
     attrs,
     emit: emit2,
-    render: render7,
+    render: render8,
     renderCache,
     props,
     data,
@@ -6464,7 +6808,7 @@ function renderComponentRoot(instance) {
         }
       }) : proxyToUse;
       result = normalizeVNode(
-        render7.call(
+        render8.call(
           thisProxy,
           proxyToUse,
           renderCache,
@@ -7616,9 +7960,9 @@ function initCustomFormatter() {
     if (instance.data !== EMPTY_OBJ) {
       blocks.push(createInstanceBlock("data", toRaw(instance.data)));
     }
-    const computed4 = extractKeys(instance, "computed");
-    if (computed4) {
-      blocks.push(createInstanceBlock("computed", computed4));
+    const computed3 = extractKeys(instance, "computed");
+    if (computed3) {
+      blocks.push(createInstanceBlock("computed", computed3));
     }
     const injected = extractKeys(instance, "inject");
     if (injected) {
@@ -20516,50 +20860,236 @@ var usePluginStore = defineStore("plugin", {
 // src/store/prompts.ts
 var usePromptStore = defineStore("prompts", () => {
   const pluginStore = usePluginStore();
-  const promptStats = ref();
+  const promptStats = ref({});
   const selectedDate = ref((/* @__PURE__ */ new Date()).toISOString().split("T")[0]);
   const historyCard = ref(null);
+  const normalizeText = (text) => text?.replace(/\s+/g, " ").trim() || "";
+  const findPromptByIdInStats = (stats, id2) => {
+    for (const date2 in stats) {
+      const dayStats = stats[date2];
+      if (!dayStats?.prompt_content) {
+        continue;
+      }
+      const found = dayStats.prompt_content.find((item) => item.id_timestamp === id2);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
+  };
+  const findPromptLocationById = (id2) => {
+    if (!promptStats.value)
+      return null;
+    for (const date2 in promptStats.value) {
+      const dayStats = promptStats.value[date2];
+      if (!dayStats?.prompt_content) {
+        continue;
+      }
+      const found = dayStats.prompt_content.find((item) => item.id_timestamp === id2);
+      if (found) {
+        return { date: date2, item: found };
+      }
+    }
+    return null;
+  };
+  const findPromptLocationBySourceSelection = (sourceSelection, preferredId) => {
+    const normalizedSelection = normalizeText(sourceSelection);
+    if (!normalizedSelection) {
+      const preferred2 = preferredId ? findPromptLocationById(preferredId) : null;
+      return preferred2 ? { ...preferred2, matchedSelection: false } : null;
+    }
+    const preferred = preferredId ? findPromptLocationById(preferredId) : null;
+    if (preferred && normalizeText(preferred.item.answer).includes(normalizedSelection)) {
+      return { ...preferred, matchedSelection: true };
+    }
+    for (const date2 in promptStats.value) {
+      const dayStats = promptStats.value[date2];
+      if (!dayStats?.prompt_content) {
+        continue;
+      }
+      const found = dayStats.prompt_content.find((item) => {
+        return normalizeText(item.answer).includes(normalizedSelection);
+      });
+      if (found) {
+        return { date: date2, item: found, matchedSelection: true };
+      }
+    }
+    return preferred ? { ...preferred, matchedSelection: false } : null;
+  };
+  const updatePromptSourceConversationId = async (targetId, sourceConversationId) => {
+    const target2 = findPromptLocationById(targetId);
+    if (!target2 || target2.item.source_conversation_id === sourceConversationId) {
+      return;
+    }
+    const newStats = { ...promptStats.value };
+    const dayStats = newStats[target2.date];
+    if (!dayStats?.prompt_content) {
+      return;
+    }
+    newStats[target2.date] = {
+      ...dayStats,
+      prompt_content: dayStats.prompt_content.map((item) => {
+        if (item.id_timestamp !== targetId) {
+          return item;
+        }
+        return {
+          ...item,
+          source_conversation_id: sourceConversationId
+        };
+      })
+    };
+    promptStats.value = newStats;
+    await syncSettings(newStats);
+  };
+  const migrateLegacyFollowUps = async () => {
+    if (!pluginStore.plugin) {
+      return;
+    }
+    const legacyFollowUps = pluginStore.plugin.settings.followUpConversations || [];
+    if (!legacyFollowUps.length) {
+      return;
+    }
+    const newStats = { ...promptStats.value };
+    legacyFollowUps.forEach((item) => {
+      const responseConversation = item.response_conversation_id ? findPromptByIdInStats(newStats, item.response_conversation_id) : null;
+      if (responseConversation) {
+        if (!responseConversation.source_selection) {
+          responseConversation.source_selection = item.source_selection;
+        }
+        if (!responseConversation.source_conversation_id) {
+          responseConversation.source_conversation_id = item.source_conversation_id;
+        }
+        return;
+      }
+      const existingDraft = findPromptByIdInStats(newStats, item.id);
+      if (existingDraft) {
+        return;
+      }
+      const createdDate = item.created_at?.split("T")[0] || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+      if (!newStats[createdDate]) {
+        newStats[createdDate] = { num: 0, prompt_content: [] };
+      }
+      newStats[createdDate].prompt_content.push({
+        id_timestamp: item.id,
+        prompt: item.question,
+        answer: "",
+        source_conversation_id: item.source_conversation_id,
+        source_selection: item.source_selection
+      });
+      newStats[createdDate].num += 1;
+    });
+    promptStats.value = newStats;
+    delete pluginStore.plugin.settings.followUpConversations;
+    await syncSettings(newStats);
+  };
+  const cleanupContextSourceConversationIds = async () => {
+    if (!pluginStore.plugin) {
+      return;
+    }
+    let hasChanges = false;
+    const newStats = { ...promptStats.value };
+    Object.keys(newStats).forEach((date2) => {
+      const dayStats = newStats[date2];
+      if (!dayStats?.prompt_content) {
+        return;
+      }
+      let dayChanged = false;
+      const promptContent = dayStats.prompt_content.map((item) => {
+        let nextItem = item;
+        if (item.source_conversation_id && !item.source_selection) {
+          hasChanges = true;
+          dayChanged = true;
+          const { source_conversation_id, ...rest } = nextItem;
+          nextItem = rest;
+        }
+        return nextItem;
+      });
+      if (dayChanged) {
+        newStats[date2] = {
+          ...dayStats,
+          prompt_content: promptContent
+        };
+      }
+    });
+    if (!hasChanges) {
+      return;
+    }
+    promptStats.value = newStats;
+    await syncSettings(newStats);
+  };
+  const initializePromptStats = async () => {
+    await migrateLegacyFollowUps();
+    await cleanupContextSourceConversationIds();
+  };
   if (pluginStore.plugin) {
     promptStats.value = { ...pluginStore.plugin.settings.promptStats };
+    void initializePromptStats();
   }
-  async function addPrompt(prompt, answer, modelName) {
+  async function syncSettings(newStats = promptStats.value) {
     if (!pluginStore.plugin)
       return;
+    pluginStore.plugin.settings.promptStats = newStats;
+    delete pluginStore.plugin.settings.followUpConversations;
+    await pluginStore.plugin.saveSettings();
+  }
+  async function addPrompt(prompt, answer, modelName, contextRefs, sourceConversationId, sourceSelection) {
+    if (!pluginStore.plugin)
+      return null;
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     const newStats = { ...promptStats.value };
     if (!newStats[today]) {
       newStats[today] = { num: 0, prompt_content: [] };
     }
-    newStats[today].num += 1;
-    newStats[today].prompt_content.push({
+    const newPrompt = {
       id_timestamp: Date.now().toString(),
       prompt,
       answer,
-      model: modelName
-    });
+      model: modelName,
+      ...sourceConversationId ? { source_conversation_id: sourceConversationId } : {},
+      ...sourceSelection ? { source_selection: sourceSelection } : {},
+      ...contextRefs && contextRefs.length > 0 ? { context_refs: contextRefs } : {}
+    };
+    newStats[today].num += 1;
+    newStats[today].prompt_content.push(newPrompt);
     promptStats.value = newStats;
-    pluginStore.plugin.settings.promptStats = newStats;
-    await pluginStore.plugin.saveSettings();
+    await syncSettings(newStats);
+    return newPrompt;
   }
   function updateHistoryCard(item) {
     historyCard.value = item;
   }
-  function findAndSelectPromptById(id2) {
-    if (!promptStats.value)
-      return;
-    for (const date2 in promptStats.value) {
-      const dayStats = promptStats.value[date2];
-      if (dayStats && dayStats.prompt_content) {
-        const found = dayStats.prompt_content.find((p2) => p2.id_timestamp === id2);
-        if (found) {
-          updateHistoryCard(found);
-          return found;
-        }
-      }
-    }
-    return null;
+  function findPromptById(id2) {
+    return findPromptLocationById(id2)?.item || null;
   }
-  return { promptStats, addPrompt, selectedDate, updateHistoryCard, historyCard, findAndSelectPromptById };
+  function findAndSelectPromptById(id2) {
+    const found = findPromptLocationById(id2);
+    if (found) {
+      selectedDate.value = found.date;
+      updateHistoryCard(found.item);
+    }
+    return found?.item || null;
+  }
+  async function findAndSelectPromptBySourceSelection(sourceSelection, sourceConversationId, targetId) {
+    const found = findPromptLocationBySourceSelection(sourceSelection, sourceConversationId);
+    if (found) {
+      if (targetId && found.matchedSelection && found.item.id_timestamp !== sourceConversationId) {
+        await updatePromptSourceConversationId(targetId, found.item.id_timestamp);
+      }
+      selectedDate.value = found.date;
+      updateHistoryCard(found.item);
+    }
+    return found?.item || null;
+  }
+  return {
+    promptStats,
+    addPrompt,
+    selectedDate,
+    updateHistoryCard,
+    historyCard,
+    findPromptById,
+    findAndSelectPromptById,
+    findAndSelectPromptBySourceSelection
+  };
 });
 
 // sfc-template:/Users/mali/Desktop/Projects/dev-vault/.obsidian/plugins/deepseek-ai-assistant/src/components/ThinkingClue.vue?type=template
@@ -20576,11 +21106,714 @@ script.render = render;
 script.__file = "src/components/ThinkingClue.vue";
 var ThinkingClue_default = script;
 
+// src/composables/usePromptMentions.ts
+var buildPromptPreview = (text, maxLength = 36) => {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "Untitled prompt";
+  }
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized;
+};
+function usePromptMentions({
+  inputContent,
+  textareaRef,
+  todayPromptItems,
+  selectedReferences,
+  overlayTarget
+}) {
+  const mentionState = ref(null);
+  const activeMentionIndex = ref(0);
+  const mentionMenuPosition = ref(null);
+  const mentionMenuRootRef = ref(null);
+  const mentionMenuListRef = ref(null);
+  const filteredTodayPrompts = computed2(() => {
+    if (!mentionState.value) {
+      return [];
+    }
+    const query = mentionState.value.query.trim().toLowerCase();
+    return todayPromptItems.value.filter((item) => {
+      if (selectedReferences.value.some((selected) => selected.id_timestamp === item.id_timestamp)) {
+        return false;
+      }
+      if (!query) {
+        return true;
+      }
+      return item.prompt.toLowerCase().includes(query) || item.answer.toLowerCase().includes(query);
+    });
+  });
+  const showMentionMenu = computed2(() => Boolean(mentionState.value));
+  const emptyMentionText = computed2(() => {
+    if (!mentionState.value) {
+      return "";
+    }
+    if (!todayPromptItems.value.length) {
+      return "Today has no history conversations yet.";
+    }
+    return mentionState.value.query.trim() ? "No matching history conversations found for the current @ search." : "No remaining history conversations are available to be selected.";
+  });
+  const mentionMenuStyle = computed2(() => {
+    if (!mentionMenuPosition.value) {
+      return {
+        left: "16px",
+        top: "16px",
+        width: "360px",
+        maxWidth: "calc(100% - 32px)",
+        position: "absolute"
+      };
+    }
+    return {
+      left: `${mentionMenuPosition.value.left}px`,
+      top: `${mentionMenuPosition.value.top}px`,
+      width: `${mentionMenuPosition.value.width}px`,
+      maxWidth: `${mentionMenuPosition.value.maxWidth}px`,
+      position: "absolute"
+    };
+  });
+  const clearMentionState = () => {
+    mentionState.value = null;
+    activeMentionIndex.value = 0;
+    mentionMenuPosition.value = null;
+  };
+  const getTextareaCaretCoordinates = (textarea, position) => {
+    const computedStyle = window.getComputedStyle(textarea);
+    const mirror = document.createElement("div");
+    const propertiesToCopy = [
+      "boxSizing",
+      "width",
+      "height",
+      "overflowX",
+      "overflowY",
+      "borderTopWidth",
+      "borderRightWidth",
+      "borderBottomWidth",
+      "borderLeftWidth",
+      "paddingTop",
+      "paddingRight",
+      "paddingBottom",
+      "paddingLeft",
+      "fontStyle",
+      "fontVariant",
+      "fontWeight",
+      "fontStretch",
+      "fontSize",
+      "fontSizeAdjust",
+      "fontFamily",
+      "textAlign",
+      "textTransform",
+      "textIndent",
+      "textDecoration",
+      "letterSpacing",
+      "wordSpacing",
+      "tabSize",
+      "MozTabSize"
+    ];
+    mirror.style.position = "absolute";
+    mirror.style.visibility = "hidden";
+    mirror.style.whiteSpace = "pre-wrap";
+    mirror.style.wordWrap = "break-word";
+    mirror.style.overflow = "hidden";
+    mirror.style.top = "0";
+    mirror.style.left = "-9999px";
+    propertiesToCopy.forEach((property) => {
+      mirror.style[property] = computedStyle[property];
+    });
+    mirror.textContent = textarea.value.slice(0, position);
+    const marker = document.createElement("span");
+    marker.textContent = textarea.value.slice(position) || ".";
+    mirror.appendChild(marker);
+    document.body.appendChild(mirror);
+    const coordinates2 = {
+      left: marker.offsetLeft - textarea.scrollLeft,
+      top: marker.offsetTop - textarea.scrollTop
+    };
+    document.body.removeChild(mirror);
+    return coordinates2;
+  };
+  const updateMentionMenuPosition = () => {
+    const textarea = textareaRef.value;
+    if (!textarea || !mentionState.value) {
+      mentionMenuPosition.value = null;
+      return;
+    }
+    const positionRoot = overlayTarget?.value ?? textarea.parentElement;
+    if (!positionRoot) {
+      mentionMenuPosition.value = null;
+      return;
+    }
+    const rootRect = positionRoot.getBoundingClientRect();
+    const textareaRect = textarea.getBoundingClientRect();
+    const caret = getTextareaCaretCoordinates(textarea, mentionState.value.end);
+    const textareaStyle = window.getComputedStyle(textarea);
+    const horizontalPadding = 16;
+    const verticalPadding = 16;
+    const verticalGap = 6;
+    const preferredWidth = 360;
+    const preferredMenuHeight = 260;
+    const resolvedLineHeight = Number.parseFloat(textareaStyle.lineHeight);
+    const fallbackLineHeight = Number.parseFloat(textareaStyle.fontSize) * 1.4 || 20;
+    const caretLineHeight = Number.isFinite(resolvedLineHeight) ? resolvedLineHeight : fallbackLineHeight;
+    const availableWidth = Math.max(240, rootRect.width - horizontalPadding * 2);
+    const popupWidth = Math.min(preferredWidth, availableWidth);
+    const maxLeft = Math.max(horizontalPadding, rootRect.width - popupWidth - horizontalPadding);
+    const caretLeft = textareaRect.left - rootRect.left + caret.left;
+    const caretTop = textareaRect.top - rootRect.top + caret.top;
+    const spaceAbove = caretTop - verticalPadding;
+    const spaceBelow = rootRect.height - (caretTop + caretLineHeight) - verticalPadding;
+    const shouldPlaceAbove = spaceAbove >= preferredMenuHeight + verticalGap || spaceAbove > spaceBelow && spaceBelow < preferredMenuHeight + verticalGap;
+    const top2 = shouldPlaceAbove ? Math.max(caretTop - preferredMenuHeight - verticalGap, verticalPadding) : Math.min(caretTop + caretLineHeight + verticalGap, rootRect.height - preferredMenuHeight - verticalPadding);
+    mentionMenuPosition.value = {
+      left: Math.min(Math.max(caretLeft, horizontalPadding), maxLeft),
+      top: top2,
+      width: popupWidth,
+      maxWidth: availableWidth
+    };
+  };
+  const handleViewportChange = () => {
+    updateMentionMenuPosition();
+  };
+  const updateMentionState = () => {
+    const textarea = textareaRef.value;
+    if (!textarea) {
+      clearMentionState();
+      return;
+    }
+    const caretIndex = textarea.selectionStart ?? inputContent.value.length;
+    const contentBeforeCaret = inputContent.value.slice(0, caretIndex);
+    const match = contentBeforeCaret.match(/(^|\s)@([^\s@]*)$/);
+    if (!match) {
+      clearMentionState();
+      return;
+    }
+    const leadingPart = match[1] || "";
+    const tokenStart = contentBeforeCaret.length - match[0].length + leadingPart.length;
+    mentionState.value = {
+      query: match[2] || "",
+      start: tokenStart,
+      end: caretIndex
+    };
+    nextTick(updateMentionMenuPosition);
+  };
+  const handleCaretChange = () => {
+    updateMentionState();
+  };
+  const selectMention = async (item) => {
+    if (!mentionState.value) {
+      return;
+    }
+    if (!selectedReferences.value.some((selected) => selected.id_timestamp === item.id_timestamp)) {
+      selectedReferences.value = [...selectedReferences.value, item];
+    }
+    const before = inputContent.value.slice(0, mentionState.value.start);
+    const after = inputContent.value.slice(mentionState.value.end);
+    const needsSpace = after.length > 0 && !after.startsWith(" ") && !before.endsWith(" ") ? " " : "";
+    inputContent.value = `${before}${needsSpace}${after}`;
+    clearMentionState();
+    await nextTick();
+    const nextCaret = before.length + needsSpace.length;
+    textareaRef.value?.focus();
+    textareaRef.value?.setSelectionRange(nextCaret, nextCaret);
+    updateMentionMenuPosition();
+  };
+  const removeReference = (id2) => {
+    selectedReferences.value = selectedReferences.value.filter((item) => item.id_timestamp !== id2);
+  };
+  const scrollActiveMentionIntoView = () => {
+    const list = mentionMenuListRef.value;
+    if (!list || !filteredTodayPrompts.value.length) {
+      return;
+    }
+    const activeItem = list.querySelector(`[data-mention-index="${activeMentionIndex.value}"]`);
+    activeItem?.scrollIntoView({ block: "nearest" });
+  };
+  const handleMentionKeydown = (event) => {
+    if (!showMentionMenu.value) {
+      return;
+    }
+    const itemCount = filteredTodayPrompts.value.length;
+    if (event.key === "ArrowDown") {
+      if (!itemCount) {
+        return;
+      }
+      event.preventDefault();
+      activeMentionIndex.value = (activeMentionIndex.value + 1) % itemCount;
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      if (!itemCount) {
+        return;
+      }
+      event.preventDefault();
+      activeMentionIndex.value = (activeMentionIndex.value - 1 + itemCount) % itemCount;
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const activeItem = filteredTodayPrompts.value[activeMentionIndex.value];
+      if (activeItem) {
+        void selectMention(activeItem);
+      }
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      clearMentionState();
+    }
+  };
+  watch2(filteredTodayPrompts, (items) => {
+    if (!items.length) {
+      activeMentionIndex.value = 0;
+      return;
+    }
+    if (activeMentionIndex.value >= items.length) {
+      activeMentionIndex.value = 0;
+    }
+    nextTick(updateMentionMenuPosition);
+    nextTick(scrollActiveMentionIntoView);
+  });
+  watch2(activeMentionIndex, () => {
+    nextTick(scrollActiveMentionIntoView);
+  });
+  watch2(showMentionMenu, (visible) => {
+    if (!visible) {
+      mentionMenuPosition.value = null;
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+      return;
+    }
+    activeMentionIndex.value = 0;
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+    nextTick(updateMentionMenuPosition);
+    nextTick(scrollActiveMentionIntoView);
+  });
+  onBeforeUnmount(() => {
+    window.removeEventListener("resize", handleViewportChange);
+    window.removeEventListener("scroll", handleViewportChange, true);
+  });
+  return {
+    activeMentionIndex,
+    filteredTodayPrompts,
+    showMentionMenu,
+    emptyMentionText,
+    mentionMenuStyle,
+    mentionMenuRootRef,
+    mentionMenuListRef,
+    clearMentionState,
+    updateMentionState,
+    handleCaretChange,
+    selectMention,
+    removeReference,
+    handleMentionKeydown
+  };
+}
+
+// sfc-script:/Users/mali/Desktop/Projects/dev-vault/.obsidian/plugins/deepseek-ai-assistant/src/components/FollowUpQuestionCard.vue?type=script
+var FollowUpQuestionCard_default = /* @__PURE__ */ defineComponent({
+  __name: "FollowUpQuestionCard",
+  props: {
+    selectionAction: { type: null, required: true },
+    isFollowUpComposerOpen: { type: Boolean, required: true },
+    followUpQuestionText: { type: String, required: true },
+    followUpReferences: { type: Array, required: true },
+    todayPromptItems: { type: Array, required: true },
+    availableModels: { type: Array, required: true },
+    selectedModelId: { type: String, required: true },
+    overlayTarget: { type: null, required: false }
+  },
+  emits: ["open", "close", "send", "update:followUpQuestionText", "update:followUpReferences", "update:selectedModelId"],
+  setup(__props, { expose: __expose, emit: __emit }) {
+    __expose();
+    const props = __props;
+    const rootRef = ref(null);
+    const textareaRef = ref(null);
+    const followUpQuestionTextModel = computed2({
+      get: () => props.followUpQuestionText,
+      set: (value) => emit2("update:followUpQuestionText", value)
+    });
+    const followUpReferencesModel = computed2({
+      get: () => props.followUpReferences,
+      set: (value) => emit2("update:followUpReferences", value)
+    });
+    const todayPromptItemsModel = computed2(() => props.todayPromptItems);
+    const {
+      activeMentionIndex,
+      filteredTodayPrompts,
+      showMentionMenu,
+      emptyMentionText,
+      mentionMenuStyle,
+      mentionMenuRootRef,
+      mentionMenuListRef,
+      handleCaretChange,
+      selectMention,
+      removeReference,
+      handleMentionKeydown
+    } = usePromptMentions({
+      inputContent: followUpQuestionTextModel,
+      textareaRef,
+      todayPromptItems: todayPromptItemsModel,
+      selectedReferences: followUpReferencesModel,
+      overlayTarget: computed2(() => props.overlayTarget)
+    });
+    const floatingStyle = computed2(() => {
+      if (!props.selectionAction) {
+        return {};
+      }
+      const isComposer = props.isFollowUpComposerOpen;
+      const horizontalPadding = isComposer ? 172 : 24;
+      const verticalOffset = isComposer ? 12 : 10;
+      const translateY2 = props.selectionAction.placement === "above" ? `calc(-100% - ${verticalOffset}px)` : `${verticalOffset}px`;
+      return {
+        top: `${props.selectionAction.top}px`,
+        left: `clamp(${horizontalPadding}px, ${props.selectionAction.left}px, calc(100% - ${horizontalPadding}px))`,
+        transform: `translate(-50%, ${translateY2})`
+      };
+    });
+    const emit2 = __emit;
+    const handleSend = () => {
+      const promptText = props.followUpQuestionText.trim();
+      const sourceSelection = props.selectionAction?.text?.trim();
+      if (!promptText || !sourceSelection) {
+        return;
+      }
+      emit2("send", {
+        promptText,
+        sourceSelection,
+        sourceConversationId: props.selectionAction.sourceConversationId
+      });
+    };
+    let isDocumentPointerDownBound = false;
+    const handleDocumentPointerDown = (event) => {
+      if (!props.selectionAction) {
+        return;
+      }
+      const target2 = event.target;
+      if (!(target2 instanceof Node)) {
+        return;
+      }
+      if (rootRef.value?.contains(target2) || mentionMenuRootRef.value?.contains(target2)) {
+        return;
+      }
+      emit2("close");
+    };
+    const bindDocumentPointerDown = () => {
+      if (isDocumentPointerDownBound) {
+        return;
+      }
+      document.addEventListener("mousedown", handleDocumentPointerDown, true);
+      isDocumentPointerDownBound = true;
+    };
+    const unbindDocumentPointerDown = () => {
+      if (!isDocumentPointerDownBound) {
+        return;
+      }
+      document.removeEventListener("mousedown", handleDocumentPointerDown, true);
+      isDocumentPointerDownBound = false;
+    };
+    watch2(
+      () => props.selectionAction,
+      (value) => {
+        if (value) {
+          bindDocumentPointerDown();
+          return;
+        }
+        unbindDocumentPointerDown();
+      },
+      { immediate: true }
+    );
+    onBeforeUnmount(() => {
+      unbindDocumentPointerDown();
+    });
+    const __returned__ = { props, rootRef, textareaRef, followUpQuestionTextModel, followUpReferencesModel, todayPromptItemsModel, activeMentionIndex, filteredTodayPrompts, showMentionMenu, emptyMentionText, mentionMenuStyle, mentionMenuRootRef, mentionMenuListRef, handleCaretChange, selectMention, removeReference, handleMentionKeydown, floatingStyle, emit: emit2, handleSend, get isDocumentPointerDownBound() {
+      return isDocumentPointerDownBound;
+    }, set isDocumentPointerDownBound(v2) {
+      isDocumentPointerDownBound = v2;
+    }, handleDocumentPointerDown, bindDocumentPointerDown, unbindDocumentPointerDown, Teleport, get buildPromptPreview() {
+      return buildPromptPreview;
+    } };
+    Object.defineProperty(__returned__, "__isScriptSetup", { enumerable: false, value: true });
+    return __returned__;
+  }
+});
+
+// sfc-template:/Users/mali/Desktop/Projects/dev-vault/.obsidian/plugins/deepseek-ai-assistant/src/components/FollowUpQuestionCard.vue?type=template
+var _hoisted_12 = { class: "mb-3 rounded-xl bg-[var(--background-secondary)] px-3 py-2 text-xs text-[var(--text-muted)] line-clamp-3" };
+var _hoisted_2 = {
+  key: 0,
+  class: "mb-2 flex flex-wrap gap-2"
+};
+var _hoisted_3 = ["onClick", "title"];
+var _hoisted_4 = { class: "truncate max-w-[220px]" };
+var _hoisted_5 = ["value"];
+var _hoisted_6 = {
+  ref: "mentionMenuListRef",
+  class: "mention-menu-scroll h-56 overflow-y-auto overflow-x-auto py-0.5"
+};
+var _hoisted_7 = ["data-mention-index", "onMousedown"];
+var _hoisted_8 = { class: "flex w-full min-w-0 flex-col items-start gap-0.5 text-left" };
+var _hoisted_9 = { class: "block w-full break-words text-[13px] leading-5 text-[var(--text-normal)]" };
+var _hoisted_10 = { class: "w-full break-words text-left text-[11px] leading-4 text-[var(--text-muted)] line-clamp-2" };
+var _hoisted_11 = {
+  key: 0,
+  class: "px-3 py-3 text-left text-sm text-[var(--text-muted)] break-words"
+};
+var _hoisted_122 = { class: "mt-3 flex items-center gap-2" };
+var _hoisted_13 = { class: "relative min-w-0 flex-1" };
+var _hoisted_14 = ["value"];
+var _hoisted_15 = ["value"];
+function render2(_ctx, _cache, $props, $setup, $data, $options) {
+  return openBlock(), createBlock(Teleport, {
+    to: $props.overlayTarget || "body",
+    disabled: !$props.overlayTarget
+  }, [
+    $props.selectionAction ? (openBlock(), createElementBlock(
+      "div",
+      {
+        key: 0,
+        ref: "rootRef",
+        class: "absolute z-[1000]",
+        style: normalizeStyle($setup.floatingStyle)
+      },
+      [
+        !$props.isFollowUpComposerOpen ? (openBlock(), createElementBlock(
+          "button",
+          {
+            key: 0,
+            class: "flex h-9 w-9 items-center justify-center rounded-full border border-[var(--apple-border)] bg-[var(--background-primary)] text-[var(--text-normal)] shadow-lg transition-colors hover:border-apple-blue hover:text-apple-blue",
+            title: "Create follow-up",
+            onMousedown: _cache[0] || (_cache[0] = withModifiers(() => {
+            }, ["prevent"])),
+            onClick: _cache[1] || (_cache[1] = withModifiers(($event) => _ctx.$emit("open"), ["stop"]))
+          },
+          [..._cache[9] || (_cache[9] = [
+            createBaseVNode(
+              "svg",
+              {
+                width: "16",
+                height: "16",
+                viewBox: "0 0 24 24",
+                fill: "none",
+                stroke: "currentColor",
+                "stroke-width": "2",
+                "stroke-linecap": "round",
+                "stroke-linejoin": "round"
+              },
+              [
+                createBaseVNode("path", { d: "M12 5v14" }),
+                createBaseVNode("path", { d: "M5 12h14" })
+              ],
+              -1
+              /* CACHED */
+            )
+          ])],
+          32
+          /* NEED_HYDRATION */
+        )) : (openBlock(), createElementBlock(
+          "div",
+          {
+            key: 1,
+            class: "w-[320px] rounded-2xl border border-[var(--apple-border)] bg-[var(--background-primary)] p-3 shadow-2xl",
+            onMousedown: _cache[8] || (_cache[8] = withModifiers(() => {
+            }, ["stop"]))
+          },
+          [
+            _cache[13] || (_cache[13] = createBaseVNode(
+              "div",
+              { class: "mb-2 text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]" },
+              "Follow-up Questions",
+              -1
+              /* CACHED */
+            )),
+            createBaseVNode(
+              "div",
+              _hoisted_12,
+              toDisplayString($props.selectionAction.text),
+              1
+              /* TEXT */
+            ),
+            $props.followUpReferences.length ? (openBlock(), createElementBlock("div", _hoisted_2, [
+              (openBlock(true), createElementBlock(
+                Fragment,
+                null,
+                renderList($props.followUpReferences, (item) => {
+                  return openBlock(), createElementBlock("button", {
+                    key: item.id_timestamp,
+                    class: "max-w-full inline-flex items-center gap-2 rounded-lg border border-[var(--apple-border)] bg-[var(--background-primary)] px-3 py-1 text-xs text-[var(--text-normal)] transition-colors hover:border-apple-blue",
+                    onClick: ($event) => $setup.removeReference(item.id_timestamp),
+                    type: "button",
+                    title: item.prompt
+                  }, [
+                    createBaseVNode(
+                      "span",
+                      _hoisted_4,
+                      "@ " + toDisplayString($setup.buildPromptPreview(item.prompt)),
+                      1
+                      /* TEXT */
+                    ),
+                    _cache[10] || (_cache[10] = createBaseVNode(
+                      "span",
+                      { class: "text-[var(--text-muted)]" },
+                      "\xD7",
+                      -1
+                      /* CACHED */
+                    ))
+                  ], 8, _hoisted_3);
+                }),
+                128
+                /* KEYED_FRAGMENT */
+              ))
+            ])) : createCommentVNode("v-if", true),
+            createBaseVNode("textarea", {
+              ref: "textareaRef",
+              value: $props.followUpQuestionText,
+              class: "min-h-[88px] w-full resize-none rounded-xl border border-[var(--background-modifier-border)] bg-[var(--background-primary)] px-3 py-2 text-sm leading-relaxed text-[var(--text-normal)] outline-none transition-colors focus:border-apple-blue",
+              placeholder: "Capture the next question from this answer...",
+              onInput: _cache[2] || (_cache[2] = ($event) => _ctx.$emit("update:followUpQuestionText", $event.target.value)),
+              onClick: _cache[3] || (_cache[3] = (...args) => $setup.handleCaretChange && $setup.handleCaretChange(...args)),
+              onKeyup: _cache[4] || (_cache[4] = (...args) => $setup.handleCaretChange && $setup.handleCaretChange(...args)),
+              onKeydown: _cache[5] || (_cache[5] = (...args) => $setup.handleMentionKeydown && $setup.handleMentionKeydown(...args)),
+              onScroll: _cache[6] || (_cache[6] = (...args) => $setup.handleCaretChange && $setup.handleCaretChange(...args))
+            }, null, 40, _hoisted_5),
+            (openBlock(), createBlock(Teleport, {
+              to: $props.overlayTarget || "body",
+              disabled: !$props.overlayTarget
+            }, [
+              $setup.showMentionMenu ? (openBlock(), createElementBlock(
+                "div",
+                {
+                  key: 0,
+                  ref: "mentionMenuRootRef",
+                  class: "absolute z-[1000] overflow-hidden rounded-xl border border-[var(--apple-border)] bg-[var(--background-primary)] shadow-xl",
+                  style: normalizeStyle($setup.mentionMenuStyle)
+                },
+                [
+                  _cache[11] || (_cache[11] = createBaseVNode(
+                    "div",
+                    { class: "border-b border-[var(--apple-border)] px-3 py-2 text-xs text-[var(--text-muted)]" },
+                    " Today conversations ",
+                    -1
+                    /* CACHED */
+                  )),
+                  createBaseVNode(
+                    "div",
+                    _hoisted_6,
+                    [
+                      (openBlock(true), createElementBlock(
+                        Fragment,
+                        null,
+                        renderList($setup.filteredTodayPrompts, (item, index3) => {
+                          return openBlock(), createElementBlock("button", {
+                            key: item.id_timestamp,
+                            type: "button",
+                            "data-mention-index": index3,
+                            class: normalizeClass(["flex w-full min-w-0 appearance-none flex-col items-start gap-0.5 border-0 px-3 py-1.5 text-left shadow-none transition-colors", index3 === $setup.activeMentionIndex ? "bg-[var(--background-modifier-hover)]" : "bg-transparent hover:bg-[var(--background-modifier-hover)]"]),
+                            onMousedown: withModifiers(($event) => $setup.selectMention(item), ["prevent"])
+                          }, [
+                            createBaseVNode("div", _hoisted_8, [
+                              createBaseVNode(
+                                "span",
+                                _hoisted_9,
+                                toDisplayString($setup.buildPromptPreview(item.prompt, 80)),
+                                1
+                                /* TEXT */
+                              )
+                            ]),
+                            createBaseVNode(
+                              "div",
+                              _hoisted_10,
+                              toDisplayString(item.answer),
+                              1
+                              /* TEXT */
+                            )
+                          ], 42, _hoisted_7);
+                        }),
+                        128
+                        /* KEYED_FRAGMENT */
+                      )),
+                      !$setup.filteredTodayPrompts.length ? (openBlock(), createElementBlock(
+                        "div",
+                        _hoisted_11,
+                        toDisplayString($setup.emptyMentionText),
+                        1
+                        /* TEXT */
+                      )) : createCommentVNode("v-if", true)
+                    ],
+                    512
+                    /* NEED_PATCH */
+                  )
+                ],
+                4
+                /* STYLE */
+              )) : createCommentVNode("v-if", true)
+            ], 8, ["to", "disabled"])),
+            createBaseVNode("div", _hoisted_122, [
+              createBaseVNode("div", _hoisted_13, [
+                createBaseVNode("select", {
+                  value: $props.selectedModelId,
+                  class: "w-full appearance-none rounded-lg border border-[var(--background-modifier-border)] bg-[var(--background-primary)] px-3 py-1.5 pr-8 text-xs font-medium text-[var(--text-normal)] outline-none transition-colors focus:border-apple-blue",
+                  onChange: _cache[7] || (_cache[7] = ($event) => $setup.emit("update:selectedModelId", $event.target.value))
+                }, [
+                  (openBlock(true), createElementBlock(
+                    Fragment,
+                    null,
+                    renderList($props.availableModels, (model) => {
+                      return openBlock(), createElementBlock("option", {
+                        key: model.id,
+                        value: model.id
+                      }, toDisplayString(model.name), 9, _hoisted_15);
+                    }),
+                    128
+                    /* KEYED_FRAGMENT */
+                  ))
+                ], 40, _hoisted_14),
+                _cache[12] || (_cache[12] = createBaseVNode(
+                  "div",
+                  { class: "pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-[var(--text-muted)]" },
+                  [
+                    createBaseVNode("svg", {
+                      width: "10",
+                      height: "10",
+                      viewBox: "0 0 24 24",
+                      fill: "none",
+                      stroke: "currentColor",
+                      "stroke-width": "2",
+                      "stroke-linecap": "round",
+                      "stroke-linejoin": "round"
+                    }, [
+                      createBaseVNode("path", { d: "M6 9l6 6 6-6" })
+                    ])
+                  ],
+                  -1
+                  /* CACHED */
+                ))
+              ]),
+              createBaseVNode("button", {
+                class: "rounded-lg bg-apple-blue px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-600",
+                onClick: withModifiers($setup.handleSend, ["stop"])
+              }, " Ask now ")
+            ])
+          ],
+          32
+          /* NEED_HYDRATION */
+        ))
+      ],
+      4
+      /* STYLE */
+    )) : createCommentVNode("v-if", true)
+  ], 8, ["to", "disabled"]);
+}
+
+// src/components/FollowUpQuestionCard.vue
+FollowUpQuestionCard_default.render = render2;
+FollowUpQuestionCard_default.__file = "src/components/FollowUpQuestionCard.vue";
+FollowUpQuestionCard_default.__scopeId = "data-v-4fa1a257";
+var FollowUpQuestionCard_default2 = FollowUpQuestionCard_default;
+
 // sfc-script:/Users/mali/Desktop/Projects/dev-vault/.obsidian/plugins/deepseek-ai-assistant/src/components/AICard.vue?type=script
 var AICard_default = /* @__PURE__ */ defineComponent({
   __name: "AICard",
   props: {
-    plugin: { type: null, required: true }
+    plugin: { type: null, required: true },
+    overlayTarget: { type: null, required: false }
   },
   setup(__props, { expose: __expose }) {
     __expose();
@@ -20599,11 +21832,13 @@ var AICard_default = /* @__PURE__ */ defineComponent({
       if (props.plugin.registerSettingsListener) {
         props.plugin.registerSettingsListener(updateModels);
       }
+      document.addEventListener("selectionchange", updateAnswerSelection);
     });
     onUnmounted(() => {
       if (props.plugin.unregisterSettingsListener) {
         props.plugin.unregisterSettingsListener(updateModels);
       }
+      document.removeEventListener("selectionchange", updateAnswerSelection);
     });
     const inputContent = ref("");
     const isLoading = ref(false);
@@ -20613,9 +21848,47 @@ var AICard_default = /* @__PURE__ */ defineComponent({
     const chatModel = ref(availableModels.value[0]?.id || "deepseek-reasoner");
     const textareaRef = ref(null);
     const answerContainerRef = ref(null);
+    const selectedReferences = ref([]);
+    const selectionAction = ref(null);
+    const isFollowUpComposerOpen = ref(false);
+    const followUpQuestionText = ref("");
+    const followUpSelectedReferences = ref([]);
     const historyItem = computed2(() => promptStore.historyCard);
     const historyAnswer = computed2(() => {
       return historyItem.value?.answer || "";
+    });
+    const currentDisplayConversation = computed2(() => {
+      if (!historyItem.value?.id_timestamp) {
+        return null;
+      }
+      return historyItem.value;
+    });
+    const todayPromptItems = computed2(() => {
+      const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+      const promptStats = promptStore.promptStats;
+      const items = promptStats?.[today]?.prompt_content || [];
+      return [...items].sort((left2, right2) => Number(right2.id_timestamp) - Number(left2.id_timestamp));
+    });
+    const {
+      activeMentionIndex,
+      filteredTodayPrompts,
+      showMentionMenu,
+      emptyMentionText,
+      mentionMenuStyle,
+      mentionMenuRootRef,
+      mentionMenuListRef,
+      clearMentionState,
+      updateMentionState,
+      handleCaretChange,
+      selectMention,
+      removeReference,
+      handleMentionKeydown
+    } = usePromptMentions({
+      inputContent,
+      textareaRef,
+      todayPromptItems,
+      selectedReferences,
+      overlayTarget: computed2(() => props.overlayTarget)
     });
     const adjustHeight = () => {
       const textarea = textareaRef.value;
@@ -20628,25 +21901,114 @@ var AICard_default = /* @__PURE__ */ defineComponent({
     };
     watch2(inputContent, () => {
       nextTick(adjustHeight);
+      nextTick(updateMentionState);
     });
-    answerContainerRef.value;
-    watch2(historyAnswer, async () => {
-      const container = document.querySelector(".answer-field");
-      if (container && historyAnswer.value) {
-        container.empty();
-        await import_obsidian2.MarkdownRenderer.render(
-          props.plugin.app,
-          historyAnswer.value,
-          container,
-          "/",
-          props.plugin.app.workspace.getLeavesOfType("deepseek-ai-assistant-itemview")[0].view
-        );
+    watch2(historyItem, (item) => {
+      if (item) {
+        return;
       }
+      hasResponse.value = false;
+      clearSelectionAction();
     });
-    const handleCommand = (command) => {
-      new import_obsidian2.Notice(`click on item ${command}`);
+    watch2(historyAnswer, async () => {
+      await renderAnswerMarkdown(historyAnswer.value);
+    });
+    const resetFollowUpComposer = () => {
+      isFollowUpComposerOpen.value = false;
+      followUpQuestionText.value = "";
+      followUpSelectedReferences.value = [];
     };
-    const submit = async () => {
+    const clearSelectionAction = () => {
+      selectionAction.value = null;
+      resetFollowUpComposer();
+    };
+    const renderAnswerMarkdown = async (content) => {
+      const container = answerContainerRef.value;
+      if (!container) {
+        return;
+      }
+      container.empty();
+      if (!content) {
+        return;
+      }
+      const assistantView = props.plugin.app.workspace.getLeavesOfType("deepseek-ai-assistant-itemview")[0]?.view;
+      if (!assistantView) {
+        return;
+      }
+      await import_obsidian2.MarkdownRenderer.render(
+        props.plugin.app,
+        content,
+        container,
+        "/",
+        assistantView
+      );
+    };
+    const updateAnswerSelection = () => {
+      if (isFollowUpComposerOpen.value) {
+        return;
+      }
+      const container = answerContainerRef.value;
+      const overlayRoot = props.overlayTarget ?? container?.closest("[data-follow-up-overlay-root]");
+      const selection2 = window.getSelection();
+      if (!container || !overlayRoot || !selection2 || selection2.rangeCount === 0 || selection2.isCollapsed || !currentDisplayConversation.value) {
+        selectionAction.value = null;
+        return;
+      }
+      const range5 = selection2.getRangeAt(0);
+      const ancestor = range5.commonAncestorContainer.nodeType === Node.TEXT_NODE ? range5.commonAncestorContainer.parentNode : range5.commonAncestorContainer;
+      if (!ancestor || !container.contains(ancestor)) {
+        selectionAction.value = null;
+        return;
+      }
+      const text = selection2.toString().replace(/\s+/g, " ").trim();
+      if (!text) {
+        selectionAction.value = null;
+        return;
+      }
+      const rangeRect = range5.getBoundingClientRect();
+      const overlayRect = overlayRoot.getBoundingClientRect();
+      if (!rangeRect.width && !rangeRect.height) {
+        selectionAction.value = null;
+        return;
+      }
+      const composerHeight = 236;
+      const floatingGap = 12;
+      const viewportPadding = 16;
+      const spaceAbove = rangeRect.top - overlayRect.top - viewportPadding;
+      const spaceBelow = overlayRect.bottom - rangeRect.bottom - viewportPadding;
+      const placement = spaceAbove >= composerHeight + floatingGap ? "above" : spaceBelow >= composerHeight + floatingGap ? "below" : spaceAbove > spaceBelow ? "above" : "below";
+      const anchorTop = placement === "above" ? Math.max(rangeRect.top - overlayRect.top, viewportPadding + floatingGap) : Math.min(rangeRect.bottom - overlayRect.top, overlayRect.height - viewportPadding - floatingGap);
+      selectionAction.value = {
+        text,
+        sourceConversationId: currentDisplayConversation.value.id_timestamp,
+        left: Math.min(Math.max(rangeRect.left - overlayRect.left + rangeRect.width / 2, 32), overlayRect.width - 32),
+        top: anchorTop,
+        placement
+      };
+    };
+    const openFollowUpComposer = () => {
+      if (!selectionAction.value) {
+        return;
+      }
+      isFollowUpComposerOpen.value = true;
+      followUpQuestionText.value = "";
+      followUpSelectedReferences.value = [];
+    };
+    const closeFollowUpComposer = () => {
+      clearSelectionAction();
+      window.getSelection()?.removeAllRanges();
+    };
+    const mergeReferences = (...groups2) => {
+      const uniqueReferences = /* @__PURE__ */ new Map();
+      groups2.flat().forEach((item) => {
+        if (!item?.id_timestamp || uniqueReferences.has(item.id_timestamp)) {
+          return;
+        }
+        uniqueReferences.set(item.id_timestamp, item);
+      });
+      return Array.from(uniqueReferences.values());
+    };
+    const submitPrompt = async (promptText, references = selectedReferences.value, sourceConversationId, sourceSelection) => {
       const container = answerContainerRef.value;
       if (container)
         container.empty();
@@ -20668,11 +22030,30 @@ var AICard_default = /* @__PURE__ */ defineComponent({
           dangerouslyAllowBrowser: true
         });
         let fullResponse = "";
+        const orderedReferences = [...references].sort((left2, right2) => Number(left2.id_timestamp) - Number(right2.id_timestamp));
+        const messages = [
+          { role: "system", content: "\u4F60\u662F\u4E00\u4E2AAI\u52A9\u624B\uFF0C\u8BF7\u6839\u636E\u7528\u6237\u7684\u95EE\u9898\u7ED9\u51FA\u56DE\u7B54" },
+          ...orderedReferences.flatMap((item) => {
+            return [
+              { role: "user", content: item.prompt },
+              { role: "assistant", content: item.answer }
+            ];
+          }),
+          ...sourceSelection ? [{
+            role: "system",
+            content: [
+              "\u5F53\u524D\u7528\u6237\u6B63\u5728\u57FA\u4E8E\u4E0A\u4E00\u8F6E\u56DE\u7B54\u4E2D\u7684\u4E00\u4E2A\u9009\u4E2D\u7247\u6BB5\u7EE7\u7EED\u8FFD\u95EE\u3002",
+              "\u56DE\u7B54\u540E\u7EED\u95EE\u9898\u65F6\uFF0C\u8BF7\u9075\u5B88\u4EE5\u4E0B\u89C4\u5219\uFF1A",
+              "1. \u5982\u679C\u7528\u6237\u7684\u95EE\u9898\u662F\u5728\u8FFD\u95EE\u539F\u56E0\u3001\u7EC6\u8282\u3001\u8FB9\u754C\u6761\u4EF6\u6216\u793A\u4F8B\uFF0C\u56DE\u7B54\u65F6\u8981\u76F4\u63A5\u5BF9\u5E94\u5230\u9009\u4E2D\u7247\u6BB5\uFF0C\u4E0D\u8981\u6CDB\u6CDB\u91CD\u8FF0\u6574\u6BB5\u5386\u53F2\u5BF9\u8BDD\u3002",
+              "",
+              "\u7528\u6237\u9009\u4E2D\u7684\u7247\u6BB5\uFF1A",
+              sourceSelection
+            ].join("\n")
+          }] : [],
+          { role: "user", content: promptText }
+        ];
         const completion = await openai.chat.completions.create({
-          messages: [
-            { role: "system", content: "\u4F60\u662F\u4E00\u4E2AAI\u52A9\u624B\uFF0C\u8BF7\u6839\u636E\u7528\u6237\u7684\u95EE\u9898\u7ED9\u51FA\u56DE\u7B54" },
-            { role: "user", content: inputContent.value }
-          ],
+          messages,
           model: selectedModelConfig.modelId,
           // Use the API Model ID from config
           stream: true
@@ -20684,22 +22065,24 @@ var AICard_default = /* @__PURE__ */ defineComponent({
               isThinking.value = false;
             }
             fullResponse += content;
-            if (container) {
-              container.empty();
-              await import_obsidian2.MarkdownRenderer.render(
-                props.plugin.app,
-                fullResponse,
-                container,
-                "/",
-                props.plugin.app.workspace.getLeavesOfType("deepseek-ai-assistant-itemview")[0].view
-              );
-            }
+            await renderAnswerMarkdown(fullResponse);
           }
         }
         if (fullResponse) {
-          promptStore.addPrompt(inputContent.value, fullResponse, selectedModelConfig.id);
-          inputContent.value = "";
+          const contextRefIds = orderedReferences.map((item) => item.id_timestamp);
+          const savedPrompt = await promptStore.addPrompt(
+            promptText,
+            fullResponse,
+            selectedModelConfig.modelId,
+            contextRefIds,
+            sourceConversationId,
+            sourceSelection
+          );
+          if (savedPrompt) {
+            promptStore.updateHistoryCard(savedPrompt);
+          }
           hasResponse.value = true;
+          return savedPrompt;
         }
       } catch (error) {
         isThinking.value = false;
@@ -20711,62 +22094,98 @@ var AICard_default = /* @__PURE__ */ defineComponent({
           displayMessage = "**API Error 429 (Too Many Requests):**\nYou have exceeded your rate limit or quota. Please check your API provider usage.";
           new import_obsidian2.Notice("DeepSeek API Error: Rate Limit Exceeded (429)");
         }
-        if (container) {
-          await import_obsidian2.MarkdownRenderer.render(
-            props.plugin.app,
-            displayMessage,
-            container,
-            "/",
-            props.plugin.app.workspace.getLeavesOfType("deepseek-ai-assistant-itemview")[0].view
-          );
-        }
+        await renderAnswerMarkdown(displayMessage);
       } finally {
         isLoading.value = false;
         isThinking.value = false;
       }
     };
-    const __returned__ = { props, availableModels, updateModels, inputContent, isLoading, isThinking, hasResponse, promptStore, chatModel, textareaRef, answerContainerRef, historyItem, historyAnswer, adjustHeight, handleCommand, submit, ThinkingClue: ThinkingClue_default };
+    const submit = async () => {
+      const promptText = inputContent.value.trim();
+      if (!promptText) {
+        return;
+      }
+      const references = [...selectedReferences.value];
+      await submitPrompt(promptText, references);
+      inputContent.value = "";
+      selectedReferences.value = [];
+      clearMentionState();
+      clearSelectionAction();
+    };
+    const sendFollowUpQuestionNow = async (payload) => {
+      const promptText = payload?.promptText ?? followUpQuestionText.value.trim();
+      const sourceSelection = payload?.sourceSelection ?? selectionAction.value?.text?.trim();
+      const sourceConversationId = payload?.sourceConversationId ?? selectionAction.value?.sourceConversationId;
+      const sourceConversation = sourceConversationId ? promptStore.findPromptById(sourceConversationId) : currentDisplayConversation.value;
+      if (!promptText || !sourceSelection || !sourceConversation) {
+        return;
+      }
+      const references = mergeReferences(followUpSelectedReferences.value);
+      await submitPrompt(promptText, references, sourceConversation.id_timestamp, sourceSelection);
+      closeFollowUpComposer();
+    };
+    const __returned__ = { props, availableModels, updateModels, inputContent, isLoading, isThinking, hasResponse, promptStore, chatModel, textareaRef, answerContainerRef, selectedReferences, selectionAction, isFollowUpComposerOpen, followUpQuestionText, followUpSelectedReferences, historyItem, historyAnswer, currentDisplayConversation, todayPromptItems, activeMentionIndex, filteredTodayPrompts, showMentionMenu, emptyMentionText, mentionMenuStyle, mentionMenuRootRef, mentionMenuListRef, clearMentionState, updateMentionState, handleCaretChange, selectMention, removeReference, handleMentionKeydown, adjustHeight, resetFollowUpComposer, clearSelectionAction, renderAnswerMarkdown, updateAnswerSelection, openFollowUpComposer, closeFollowUpComposer, mergeReferences, submitPrompt, submit, sendFollowUpQuestionNow, Teleport, ThinkingClue: ThinkingClue_default, FollowUpQuestionCard: FollowUpQuestionCard_default2, get buildPromptPreview() {
+      return buildPromptPreview;
+    } };
     Object.defineProperty(__returned__, "__isScriptSetup", { enumerable: false, value: true });
     return __returned__;
   }
 });
 
 // sfc-template:/Users/mali/Desktop/Projects/dev-vault/.obsidian/plugins/deepseek-ai-assistant/src/components/AICard.vue?type=template
-var _hoisted_12 = { class: "flex flex-col h-full p-2 max-w-[900px] mx-auto w-full" };
-var _hoisted_2 = { class: "flex-1 overflow-hidden relative rounded-xl bg-transparent mb-6 group/answer" };
-var _hoisted_3 = {
+var _hoisted_16 = { class: "flex flex-col h-full p-2 pb-4 max-w-[900px] mx-auto w-full" };
+var _hoisted_22 = { class: "flex-1 overflow-hidden relative rounded-xl bg-transparent mb-6 group/answer" };
+var _hoisted_32 = {
   key: 0,
   class: "absolute inset-0 flex flex-col items-center justify-center text-[var(--text-muted)] opacity-50 pointer-events-none"
 };
-var _hoisted_4 = {
+var _hoisted_42 = {
   key: 1,
   class: "absolute inset-0 z-10"
 };
-var _hoisted_5 = {
+var _hoisted_52 = {
   ref: "answerContainerRef",
   class: "answer-field absolute inset-0 overflow-y-auto p-6 font-sans leading-relaxed select-text cursor-text prose dark:prose-invert max-w-none"
 };
-var _hoisted_6 = { class: "flex-none" };
-var _hoisted_7 = { class: "w-full flex flex-col gap-3" };
-var _hoisted_8 = { class: "relative w-full bg-[var(--background-primary)] rounded-xl shadow-sm border border-[var(--apple-border)] transition-all duration-300 focus-within:ring-2 focus-within:ring-apple-blue/20 focus-within:border-apple-blue hover:shadow-md" };
-var _hoisted_9 = { class: "absolute bottom-3 right-3 left-3 flex justify-between items-center" };
-var _hoisted_10 = { class: "relative group" };
-var _hoisted_11 = { class: "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-[var(--apple-border)]" };
-var _hoisted_122 = ["value"];
-var _hoisted_13 = ["disabled"];
-var _hoisted_14 = {
+var _hoisted_62 = { class: "flex-none" };
+var _hoisted_72 = { class: "w-full flex flex-col gap-3" };
+var _hoisted_82 = { class: "relative w-full rounded-xl bg-transparent transition-all duration-300" };
+var _hoisted_92 = {
+  key: 0,
+  class: "flex flex-wrap gap-2 px-4 pt-4 pb-1"
+};
+var _hoisted_102 = ["onClick", "title"];
+var _hoisted_112 = { class: "truncate max-w-[280px]" };
+var _hoisted_123 = {
+  ref: "mentionMenuListRef",
+  class: "mention-menu-scroll h-56 overflow-y-auto overflow-x-auto py-0.5"
+};
+var _hoisted_132 = ["data-mention-index", "onMousedown"];
+var _hoisted_142 = { class: "flex w-full min-w-0 flex-col items-start gap-0.5 text-left" };
+var _hoisted_152 = { class: "block w-full break-words text-[13px] leading-5 text-[var(--text-normal)]" };
+var _hoisted_162 = { class: "w-full break-words text-left text-[11px] leading-4 text-[var(--text-muted)] line-clamp-2" };
+var _hoisted_17 = {
+  key: 0,
+  class: "px-3 py-3 text-left text-sm text-[var(--text-muted)] break-words"
+};
+var _hoisted_18 = { class: "absolute bottom-3 left-3 right-3 z-10 flex items-center justify-between rounded-md border border-[var(--background-modifier-border)]/35 bg-[var(--background-primary)]/88 px-2 py-1 backdrop-blur-[2px]" };
+var _hoisted_19 = { class: "relative group" };
+var _hoisted_20 = { class: "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[var(--text-muted)] transition-colors cursor-pointer hover:bg-[var(--background-modifier-hover)] hover:text-[var(--text-normal)]" };
+var _hoisted_21 = ["value"];
+var _hoisted_222 = ["disabled"];
+var _hoisted_23 = {
   key: 0,
   class: "flex items-center gap-1"
 };
-var _hoisted_15 = {
+var _hoisted_24 = {
   key: 1,
-  class: "flex items-center gap-2"
+  class: "flex items-center gap-1"
 };
-function render2(_ctx, _cache, $props, $setup, $data, $options) {
-  return openBlock(), createElementBlock("div", _hoisted_12, [
+function render3(_ctx, _cache, $props, $setup, $data, $options) {
+  return openBlock(), createElementBlock("div", _hoisted_16, [
     createCommentVNode(" Answer Area "),
-    createBaseVNode("div", _hoisted_2, [
-      !$setup.historyAnswer && !$setup.isLoading && !$setup.hasResponse ? (openBlock(), createElementBlock("div", _hoisted_3, [..._cache[2] || (_cache[2] = [
+    createBaseVNode("div", _hoisted_22, [
+      !$setup.historyAnswer && !$setup.isLoading && !$setup.hasResponse ? (openBlock(), createElementBlock("div", _hoisted_32, [..._cache[9] || (_cache[9] = [
         createBaseVNode(
           "svg",
           {
@@ -20794,29 +22213,84 @@ function render2(_ctx, _cache, $props, $setup, $data, $options) {
           /* CACHED */
         )
       ])])) : createCommentVNode("v-if", true),
-      $setup.isThinking ? (openBlock(), createElementBlock("div", _hoisted_4, [
+      $setup.isThinking ? (openBlock(), createElementBlock("div", _hoisted_42, [
         createVNode($setup["ThinkingClue"])
       ])) : createCommentVNode("v-if", true),
       createBaseVNode(
         "div",
-        _hoisted_5,
+        _hoisted_52,
         null,
         512
         /* NEED_PATCH */
-      )
+      ),
+      createVNode($setup["FollowUpQuestionCard"], {
+        "selection-action": $setup.selectionAction,
+        "is-follow-up-composer-open": $setup.isFollowUpComposerOpen,
+        "follow-up-question-text": $setup.followUpQuestionText,
+        "follow-up-references": $setup.followUpSelectedReferences,
+        "today-prompt-items": $setup.todayPromptItems,
+        "available-models": $setup.availableModels,
+        "selected-model-id": $setup.chatModel,
+        "overlay-target": $props.overlayTarget,
+        onOpen: $setup.openFollowUpComposer,
+        onClose: $setup.closeFollowUpComposer,
+        onSend: $setup.sendFollowUpQuestionNow,
+        "onUpdate:followUpQuestionText": _cache[0] || (_cache[0] = ($event) => $setup.followUpQuestionText = $event),
+        "onUpdate:followUpReferences": _cache[1] || (_cache[1] = ($event) => $setup.followUpSelectedReferences = $event),
+        "onUpdate:selectedModelId": _cache[2] || (_cache[2] = ($event) => $setup.chatModel = $event)
+      }, null, 8, ["selection-action", "is-follow-up-composer-open", "follow-up-question-text", "follow-up-references", "today-prompt-items", "available-models", "selected-model-id", "overlay-target"])
     ]),
     createCommentVNode(" Input Area "),
-    createBaseVNode("div", _hoisted_6, [
-      createBaseVNode("div", _hoisted_7, [
-        createBaseVNode("div", _hoisted_8, [
+    createBaseVNode("div", _hoisted_62, [
+      createBaseVNode("div", _hoisted_72, [
+        createCommentVNode(" \u5916\u5C42\u8F93\u5165\u5BB9\u5668\u8FB9\u6846\uFF08\u4F1A\u628A\u5DF2\u9009\u6807\u7B7E\u548C textarea \u4E00\u8D77\u6846\u8FDB\u53BB\uFF09 "),
+        createBaseVNode("div", _hoisted_82, [
+          createCommentVNode(" \u5DF2\u9009\u5386\u53F2\u4E0A\u4E0B\u6587\u6807\u7B7E "),
+          $setup.selectedReferences.length ? (openBlock(), createElementBlock("div", _hoisted_92, [
+            createCommentVNode(" \u5355\u6761\u5386\u53F2\u5BF9\u8BDD \u5DF2\u9009\u6807\u7B7E "),
+            (openBlock(true), createElementBlock(
+              Fragment,
+              null,
+              renderList($setup.selectedReferences, (item) => {
+                return openBlock(), createElementBlock("button", {
+                  key: item.id_timestamp,
+                  class: "max-w-full inline-flex items-center gap-2 border border-[var(--apple-border)] bg-[var(--background-primary)] px-3 py-1 text-xs text-[var(--text-normal)] transition-colors hover:border-apple-blue",
+                  onClick: ($event) => $setup.removeReference(item.id_timestamp),
+                  type: "button",
+                  title: item.prompt
+                }, [
+                  createBaseVNode(
+                    "span",
+                    _hoisted_112,
+                    "@ " + toDisplayString($setup.buildPromptPreview(item.prompt)),
+                    1
+                    /* TEXT */
+                  ),
+                  _cache[10] || (_cache[10] = createBaseVNode(
+                    "span",
+                    { class: "text-[var(--text-muted)]" },
+                    "\xD7",
+                    -1
+                    /* CACHED */
+                  ))
+                ], 8, _hoisted_102);
+              }),
+              128
+              /* KEYED_FRAGMENT */
+            ))
+          ])) : createCommentVNode("v-if", true),
           withDirectives(createBaseVNode(
             "textarea",
             {
               ref: "textareaRef",
-              class: "w-full p-4 pb-14 border-none rounded-xl resize-none text-[15px] leading-relaxed bg-transparent text-[var(--text-normal)] min-h-[120px] max-h-[250px] overflow-y-auto font-sans outline-none placeholder:text-[var(--text-muted)]",
-              "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => $setup.inputContent = $event),
-              placeholder: "Ask anything...",
-              onInput: $setup.adjustHeight
+              class: "w-full p-4 pb-14 border-none rounded-xl resize-none text-[15px] leading-relaxed bg-[var(--background-primary)] text-[var(--text-normal)] min-h-[120px] max-h-[250px] overflow-y-auto font-sans outline-none placeholder:text-[12px] placeholder:text-[var(--text-muted)]",
+              "onUpdate:modelValue": _cache[3] || (_cache[3] = ($event) => $setup.inputContent = $event),
+              placeholder: "Use @ to reference past conversations from today as context for this session.",
+              onInput: $setup.adjustHeight,
+              onClick: _cache[4] || (_cache[4] = (...args) => $setup.handleCaretChange && $setup.handleCaretChange(...args)),
+              onKeyup: _cache[5] || (_cache[5] = (...args) => $setup.handleCaretChange && $setup.handleCaretChange(...args)),
+              onKeydown: _cache[6] || (_cache[6] = (...args) => $setup.handleMentionKeydown && $setup.handleMentionKeydown(...args)),
+              onScroll: _cache[7] || (_cache[7] = (...args) => $setup.handleCaretChange && $setup.handleCaretChange(...args))
             },
             null,
             544
@@ -20824,16 +22298,90 @@ function render2(_ctx, _cache, $props, $setup, $data, $options) {
           ), [
             [vModelText, $setup.inputContent]
           ]),
+          createCommentVNode(" \u5386\u53F2\u4E0A\u4E0B\u6587\u5F39\u5C42 "),
+          (openBlock(), createBlock(Teleport, {
+            to: $props.overlayTarget || "body",
+            disabled: !$props.overlayTarget
+          }, [
+            $setup.showMentionMenu ? (openBlock(), createElementBlock(
+              "div",
+              {
+                key: 0,
+                ref: "mentionMenuRootRef",
+                class: "absolute z-[1000] overflow-hidden rounded-xl border border-[var(--apple-border)] bg-[var(--background-primary)] shadow-xl",
+                style: normalizeStyle($setup.mentionMenuStyle)
+              },
+              [
+                _cache[11] || (_cache[11] = createBaseVNode(
+                  "div",
+                  { class: "border-b border-[var(--apple-border)] px-3 py-2 text-xs text-[var(--text-muted)]" },
+                  " Today conversations ",
+                  -1
+                  /* CACHED */
+                )),
+                createBaseVNode(
+                  "div",
+                  _hoisted_123,
+                  [
+                    (openBlock(true), createElementBlock(
+                      Fragment,
+                      null,
+                      renderList($setup.filteredTodayPrompts, (item, index3) => {
+                        return openBlock(), createElementBlock("button", {
+                          key: item.id_timestamp,
+                          type: "button",
+                          "data-mention-index": index3,
+                          class: normalizeClass(["flex w-full min-w-0 appearance-none flex-col items-start gap-0.5 border-0 px-3 py-1.5 text-left shadow-none transition-colors", index3 === $setup.activeMentionIndex ? "bg-[var(--background-modifier-hover)]" : "bg-transparent hover:bg-[var(--background-modifier-hover)]"]),
+                          onMousedown: withModifiers(($event) => $setup.selectMention(item), ["prevent"])
+                        }, [
+                          createBaseVNode("div", _hoisted_142, [
+                            createBaseVNode(
+                              "span",
+                              _hoisted_152,
+                              toDisplayString($setup.buildPromptPreview(item.prompt, 80)),
+                              1
+                              /* TEXT */
+                            )
+                          ]),
+                          createBaseVNode(
+                            "div",
+                            _hoisted_162,
+                            toDisplayString(item.answer),
+                            1
+                            /* TEXT */
+                          )
+                        ], 42, _hoisted_132);
+                      }),
+                      128
+                      /* KEYED_FRAGMENT */
+                    )),
+                    !$setup.filteredTodayPrompts.length ? (openBlock(), createElementBlock(
+                      "div",
+                      _hoisted_17,
+                      toDisplayString($setup.emptyMentionText),
+                      1
+                      /* TEXT */
+                    )) : createCommentVNode("v-if", true)
+                  ],
+                  512
+                  /* NEED_PATCH */
+                )
+              ],
+              4
+              /* STYLE */
+            )) : createCommentVNode("v-if", true)
+          ], 8, ["to", "disabled"])),
           createCommentVNode(" Controls Bar "),
-          createBaseVNode("div", _hoisted_9, [
+          createCommentVNode(" \u76EE\u524D\u4F7F\u7528\u4E86\u7EDD\u5BF9\u5B9A\u4F4D "),
+          createBaseVNode("div", _hoisted_18, [
             createCommentVNode(" Model Selector "),
-            createBaseVNode("div", _hoisted_10, [
-              createBaseVNode("div", _hoisted_11, [
+            createBaseVNode("div", _hoisted_19, [
+              createBaseVNode("div", _hoisted_20, [
                 withDirectives(createBaseVNode(
                   "select",
                   {
-                    "onUpdate:modelValue": _cache[1] || (_cache[1] = ($event) => $setup.chatModel = $event),
-                    class: "appearance-none bg-transparent border-none text-[12px] font-medium text-[var(--text-normal)] cursor-pointer pr-4 focus:outline-none font-sans"
+                    "onUpdate:modelValue": _cache[8] || (_cache[8] = ($event) => $setup.chatModel = $event),
+                    class: "appearance-none bg-transparent border-none shadow-none ring-0 outline-none text-[11px] font-medium text-[var(--text-normal)] cursor-pointer pr-3 focus:border-none focus:shadow-none focus:ring-0 focus:outline-none font-sans"
                   },
                   [
                     (openBlock(true), createElementBlock(
@@ -20843,7 +22391,7 @@ function render2(_ctx, _cache, $props, $setup, $data, $options) {
                         return openBlock(), createElementBlock("option", {
                           key: model.id,
                           value: model.id
-                        }, toDisplayString(model.name), 9, _hoisted_122);
+                        }, toDisplayString(model.name), 9, _hoisted_21);
                       }),
                       128
                       /* KEYED_FRAGMENT */
@@ -20854,13 +22402,13 @@ function render2(_ctx, _cache, $props, $setup, $data, $options) {
                 ), [
                   [vModelSelect, $setup.chatModel]
                 ]),
-                _cache[3] || (_cache[3] = createBaseVNode(
+                _cache[12] || (_cache[12] = createBaseVNode(
                   "div",
-                  { class: "absolute right-2.5 pointer-events-none text-[var(--text-muted)]" },
+                  { class: "absolute right-0 pointer-events-none text-[var(--text-muted)]" },
                   [
                     createBaseVNode("svg", {
-                      width: "10",
-                      height: "10",
+                      width: "9",
+                      height: "9",
                       viewBox: "0 0 24 24",
                       fill: "none",
                       stroke: "currentColor",
@@ -20878,25 +22426,29 @@ function render2(_ctx, _cache, $props, $setup, $data, $options) {
             ]),
             createCommentVNode(" Send Button "),
             createBaseVNode("button", {
-              class: "h-8 px-4 bg-apple-blue text-white border-none rounded-full cursor-pointer text-[13px] font-semibold transition-all duration-200 flex items-center justify-center shadow-sm hover:bg-blue-600 hover:shadow-md active:scale-95 disabled:bg-[var(--background-modifier-border)] disabled:text-[var(--text-muted)] disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100",
+              class: "h-6 min-w-6 px-2 bg-transparent text-[var(--text-muted)] border border-transparent rounded-md cursor-pointer text-[11px] font-medium transition-all duration-200 flex items-center justify-center hover:bg-apple-blue/10 hover:text-apple-blue active:scale-95 disabled:bg-transparent disabled:text-[var(--text-muted)] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100",
               onClick: $setup.submit,
+              title: "Send",
+              "aria-label": "Send",
               disabled: $setup.isLoading || !$setup.inputContent.trim()
             }, [
-              !$setup.isLoading ? (openBlock(), createElementBlock("span", _hoisted_14, [..._cache[4] || (_cache[4] = [
-                createTextVNode(
-                  " Send ",
+              !$setup.isLoading ? (openBlock(), createElementBlock("span", _hoisted_23, [..._cache[13] || (_cache[13] = [
+                createBaseVNode(
+                  "span",
+                  { class: "text-[11px] leading-none" },
+                  "Send",
                   -1
                   /* CACHED */
                 ),
                 createBaseVNode(
                   "svg",
                   {
-                    width: "12",
-                    height: "12",
+                    width: "10",
+                    height: "10",
                     viewBox: "0 0 24 24",
                     fill: "none",
                     stroke: "currentColor",
-                    "stroke-width": "3",
+                    "stroke-width": "2.5",
                     "stroke-linecap": "round",
                     "stroke-linejoin": "round"
                   },
@@ -20912,11 +22464,11 @@ function render2(_ctx, _cache, $props, $setup, $data, $options) {
                   -1
                   /* CACHED */
                 )
-              ])])) : (openBlock(), createElementBlock("span", _hoisted_15, [..._cache[5] || (_cache[5] = [
+              ])])) : (openBlock(), createElementBlock("span", _hoisted_24, [..._cache[14] || (_cache[14] = [
                 createBaseVNode(
                   "svg",
                   {
-                    class: "animate-spin h-3 w-3 text-white",
+                    class: "animate-spin h-3 w-3 text-current",
                     xmlns: "http://www.w3.org/2000/svg",
                     fill: "none",
                     viewBox: "0 0 24 24"
@@ -20939,13 +22491,15 @@ function render2(_ctx, _cache, $props, $setup, $data, $options) {
                   -1
                   /* CACHED */
                 ),
-                createTextVNode(
-                  " Thinking ",
+                createBaseVNode(
+                  "span",
+                  { class: "text-[11px] leading-none" },
+                  "Thinking",
                   -1
                   /* CACHED */
                 )
               ])]))
-            ], 8, _hoisted_13)
+            ], 8, _hoisted_222)
           ])
         ])
       ])
@@ -20954,7 +22508,7 @@ function render2(_ctx, _cache, $props, $setup, $data, $options) {
 }
 
 // src/components/AICard.vue
-AICard_default.render = render2;
+AICard_default.render = render3;
 AICard_default.__file = "src/components/AICard.vue";
 AICard_default.__scopeId = "data-v-f616ee68";
 var AICard_default2 = AICard_default;
@@ -20967,7 +22521,7 @@ __export(src_exports, {
   FormatSpecifier: () => FormatSpecifier,
   InternMap: () => InternMap,
   InternSet: () => InternSet,
-  Node: () => Node,
+  Node: () => Node2,
   Path: () => Path,
   Voronoi: () => Voronoi,
   ZoomTransform: () => Transform,
@@ -33195,12 +34749,12 @@ function hierarchy(data, children2) {
   } else if (children2 === void 0) {
     children2 = objectChildren;
   }
-  var root3 = new Node(data), node, nodes = [root3], child, childs, i, n;
+  var root3 = new Node2(data), node, nodes = [root3], child, childs, i, n;
   while (node = nodes.pop()) {
     if ((childs = children2(node.data)) && (n = (childs = Array.from(childs)).length)) {
       node.children = childs;
       for (i = n - 1; i >= 0; --i) {
-        nodes.push(child = childs[i] = new Node(childs[i]));
+        nodes.push(child = childs[i] = new Node2(childs[i]));
         child.parent = node;
         child.depth = node.depth + 1;
       }
@@ -33228,13 +34782,13 @@ function computeHeight(node) {
     node.height = height;
   while ((node = node.parent) && node.height < ++height);
 }
-function Node(data) {
+function Node2(data) {
   this.data = data;
   this.depth = this.height = 0;
   this.parent = null;
 }
-Node.prototype = hierarchy.prototype = {
-  constructor: Node,
+Node2.prototype = hierarchy.prototype = {
+  constructor: Node2,
   count: count_default,
   each: each_default2,
   eachAfter: eachAfter_default,
@@ -33408,7 +34962,7 @@ function score(node) {
   var a4 = node._, b = node.next._, ab4 = a4.r + b.r, dx = (a4.x * b.r + b.x * a4.r) / ab4, dy = (a4.y * b.r + b.y * a4.r) / ab4;
   return dx * dx + dy * dy;
 }
-function Node2(circle) {
+function Node3(circle) {
   this._ = circle;
   this.next = null;
   this.previous = null;
@@ -33424,13 +34978,13 @@ function packSiblingsRandom(circles, random) {
   if (!(n > 2))
     return a4.r + b.r;
   place(b, a4, c6 = circles[2]);
-  a4 = new Node2(a4), b = new Node2(b), c6 = new Node2(c6);
+  a4 = new Node3(a4), b = new Node3(b), c6 = new Node3(c6);
   a4.next = c6.previous = b;
   b.next = a4.previous = c6;
   c6.next = b.previous = a4;
   pack:
     for (i = 3; i < n; ++i) {
-      place(a4._, b._, c6 = circles[i]), c6 = new Node2(c6);
+      place(a4._, b._, c6 = circles[i]), c6 = new Node3(c6);
       j = b.next, k2 = a4.previous, sj = b._.r, sk = a4._.r;
       do {
         if (sj <= sk) {
@@ -33617,7 +35171,7 @@ function stratify_default() {
       currentParentId = (_, i2) => P[i2];
     }
     for (i = 0, n = nodes.length; i < n; ++i) {
-      d = nodes[i], node = nodes[i] = new Node(d);
+      d = nodes[i], node = nodes[i] = new Node2(d);
       if ((nodeId = currentId(d, i, data)) != null && (nodeId += "")) {
         nodeKey = node.id = nodeId;
         nodeByKey.set(nodeKey, nodeByKey.has(nodeKey) ? ambiguous : node);
@@ -33751,7 +35305,7 @@ function TreeNode(node, i) {
   this.t = null;
   this.i = i;
 }
-TreeNode.prototype = Object.create(Node.prototype);
+TreeNode.prototype = Object.create(Node2.prototype);
 function treeRoot(root3) {
   var tree = new TreeNode(root3, 0), node, nodes = [tree], child, children2, i, n;
   while (node = nodes.pop()) {
@@ -39054,21 +40608,42 @@ var HeatMap_default = {
     var rect_count_x = ref(0);
     const scrollContainer = ref(null);
     const isDragging = ref(false);
+    const hasInitializedScroll = ref(false);
+    const lastContainerWidth = ref(0);
     let startX;
     let scrollLeft;
+    const syncScrollWithRightEdge = (previousWidth, nextWidth) => {
+      if (!scrollContainer.value || isDragging.value || !hasInitializedScroll.value) {
+        return;
+      }
+      const nextMaxScroll = Math.max(scrollContainer.value.scrollWidth - scrollContainer.value.clientWidth, 0);
+      const nextScrollLeft = scrollContainer.value.scrollLeft + previousWidth - nextWidth;
+      scrollContainer.value.scrollLeft = Math.min(Math.max(nextScrollLeft, 0), nextMaxScroll);
+    };
     const observer = new ResizeObserver((entries) => {
       for (let entry of entries) {
         var newWidth = entry.contentRect.width;
+        const previousWidth = lastContainerWidth.value || newWidth;
         const min_margin = 10;
         const col_width = pixel_width.value + pixel_margin.value;
         const fitCount = Math.floor((newWidth - 2 * min_margin + pixel_margin.value) / col_width);
-        rect_count_x.value = Math.max(53, fitCount);
-        if (rect_count_x.value > fitCount) {
-          svg_left_or_right_margin.value = 10;
+        const nextRectCount = Math.max(53, fitCount);
+        let nextMargin = 10;
+        if (nextRectCount > fitCount) {
+          nextMargin = 10;
         } else {
-          const used_width = rect_count_x.value * col_width - pixel_margin.value;
-          svg_left_or_right_margin.value = (newWidth - used_width) / 2;
+          const used_width = nextRectCount * col_width - pixel_margin.value;
+          nextMargin = (newWidth - used_width) / 2;
         }
+        const shouldRedraw = rect_count_x.value !== nextRectCount || svg_left_or_right_margin.value !== nextMargin;
+        rect_count_x.value = nextRectCount;
+        svg_left_or_right_margin.value = nextMargin;
+        lastContainerWidth.value = newWidth;
+        if (shouldRedraw) {
+          draw_svg();
+          continue;
+        }
+        syncScrollWithRightEdge(previousWidth, newWidth);
       }
     });
     const startDragging = (e) => {
@@ -39087,18 +40662,19 @@ var HeatMap_default = {
       const walk = (x4 - startX) * 1.5;
       scrollContainer.value.scrollLeft = scrollLeft - walk;
     };
-    watch2([rect_count_x, svg_left_or_right_margin], () => {
-      draw_svg();
-    });
     onMounted(async () => {
       await nextTick();
       if (scrollContainer.value) {
+        lastContainerWidth.value = scrollContainer.value.clientWidth;
         observer.observe(scrollContainer.value);
       }
       draw_svg();
     });
     const draw_svg = async () => {
       await nextTick();
+      const container = scrollContainer.value;
+      const previousMaxScroll = container ? Math.max(container.scrollWidth - container.clientWidth, 0) : 0;
+      const previousDistanceFromRight = container ? Math.max(previousMaxScroll - container.scrollLeft, 0) : 0;
       select_default2("#svg_container").selectAll("rect").remove();
       select_default2("#svg_container").selectAll("text").remove();
       const month_label_height = 20;
@@ -39171,9 +40747,16 @@ var HeatMap_default = {
       const svgHeight = svg_top_bottom_margin.value * 2 + month_label_height + (pixel_width.value + pixel_margin.value) * 7 - pixel_margin.value;
       select_default2("#svg_container").attr("height", svgHeight);
       nextTick(() => {
-        if (scrollContainer.value && !isDragging.value) {
-          scrollContainer.value.scrollLeft = scrollContainer.value.scrollWidth;
+        if (!scrollContainer.value || isDragging.value) {
+          return;
         }
+        const nextMaxScroll = Math.max(scrollContainer.value.scrollWidth - scrollContainer.value.clientWidth, 0);
+        if (!hasInitializedScroll.value) {
+          scrollContainer.value.scrollLeft = nextMaxScroll;
+          hasInitializedScroll.value = true;
+          return;
+        }
+        scrollContainer.value.scrollLeft = Math.max(nextMaxScroll - previousDistanceFromRight, 0);
       });
     };
     const handleClick = (e, v2) => {
@@ -39187,7 +40770,7 @@ var HeatMap_default = {
       return rect_count_x;
     }, set rect_count_x(v2) {
       rect_count_x = v2;
-    }, scrollContainer, isDragging, get startX() {
+    }, scrollContainer, isDragging, hasInitializedScroll, lastContainerWidth, get startX() {
       return startX;
     }, set startX(v2) {
       startX = v2;
@@ -39195,7 +40778,7 @@ var HeatMap_default = {
       return scrollLeft;
     }, set scrollLeft(v2) {
       scrollLeft = v2;
-    }, observer, startDragging, stopDragging, doDragging, draw_svg, handleClick, get d3() {
+    }, syncScrollWithRightEdge, observer, startDragging, stopDragging, doDragging, draw_svg, handleClick, get d3() {
       return src_exports;
     }, ref, onMounted, nextTick, watchEffect, watch: watch2, reactive, get usePromptStore() {
       return usePromptStore;
@@ -39206,12 +40789,12 @@ var HeatMap_default = {
 };
 
 // sfc-template:/Users/mali/Desktop/Projects/dev-vault/.obsidian/plugins/deepseek-ai-assistant/src/components/HeatMap.vue?type=template
-var _hoisted_16 = {
+var _hoisted_110 = {
   id: "container",
   class: "w-full overflow-hidden"
 };
-function render3(_ctx, _cache, $props, $setup, $data, $options) {
-  return openBlock(), createElementBlock("div", _hoisted_16, [
+function render4(_ctx, _cache, $props, $setup, $data, $options) {
+  return openBlock(), createElementBlock("div", _hoisted_110, [
     createBaseVNode(
       "div",
       {
@@ -39241,7 +40824,7 @@ function render3(_ctx, _cache, $props, $setup, $data, $options) {
 }
 
 // src/components/HeatMap.vue
-HeatMap_default.render = render3;
+HeatMap_default.render = render4;
 HeatMap_default.__file = "src/components/HeatMap.vue";
 HeatMap_default.__scopeId = "data-v-4e0aa827";
 var HeatMap_default2 = HeatMap_default;
@@ -39289,44 +40872,46 @@ var DataPanel_default = /* @__PURE__ */ defineComponent({
 });
 
 // sfc-template:/Users/mali/Desktop/Projects/dev-vault/.obsidian/plugins/deepseek-ai-assistant/src/components/DataPanel.vue?type=template
-var _hoisted_17 = { class: "w-full px-4 py-4" };
-var _hoisted_22 = { class: "flex justify-between items-center bg-[var(--background-secondary)] rounded-lg p-3 border border-[var(--apple-border)] shadow-sm" };
-var _hoisted_32 = { class: "text-xl font-semibold text-[var(--text-normal)]" };
-var _hoisted_42 = { class: "flex flex-col items-center flex-1 cursor-default" };
-var _hoisted_52 = { class: "text-xl font-semibold text-[var(--text-normal)]" };
-function render4(_ctx, _cache, $props, $setup, $data, $options) {
-  return openBlock(), createElementBlock("div", _hoisted_17, [
-    createBaseVNode("div", _hoisted_22, [
+var _hoisted_111 = { class: "w-full px-4 pb-2" };
+var _hoisted_25 = { class: "flex justify-between items-center bg-[var(--background-secondary)] rounded-lg px-3 border border-[var(--apple-border)] shadow-sm" };
+var _hoisted_33 = { class: "text-lg font-semibold leading-none text-[var(--text-normal)]" };
+var _hoisted_43 = { class: "flex flex-col items-center flex-1 cursor-default py-0.5 gap-1" };
+var _hoisted_53 = { class: "text-lg font-semibold leading-none text-[var(--text-normal)]" };
+function render5(_ctx, _cache, $props, $setup, $data, $options) {
+  return openBlock(), createElementBlock("div", _hoisted_111, [
+    createBaseVNode("div", _hoisted_25, [
+      createCommentVNode(" PROMPTS "),
       createBaseVNode("div", {
-        class: "flex flex-col items-center flex-1 border-r border-[var(--apple-border)] cursor-pointer hover:bg-[var(--apple-bg-secondary)] transition-colors rounded-l-md",
+        class: "flex flex-col items-center flex-1 border-r border-[var(--apple-border)] cursor-pointer hover:bg-[var(--apple-bg-secondary)] transition-colors rounded-l-md py-0.5 gap-1",
         onClick: $setup.onTotalPromptsClick
       }, [
         _cache[0] || (_cache[0] = createBaseVNode(
           "span",
-          { class: "text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1" },
+          { class: "inline-flex items-center rounded-full border border-[var(--background-modifier-border)]/60 bg-[var(--background-primary)]/40 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--text-faint)]" },
           "Prompts",
           -1
           /* CACHED */
         )),
         createBaseVNode(
           "b",
-          _hoisted_32,
+          _hoisted_33,
           toDisplayString($setup.totalPrompts),
           1
           /* TEXT */
         )
       ]),
-      createBaseVNode("div", _hoisted_42, [
+      createCommentVNode(" DAYS "),
+      createBaseVNode("div", _hoisted_43, [
         _cache[1] || (_cache[1] = createBaseVNode(
           "span",
-          { class: "text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1" },
+          { class: "inline-flex items-center rounded-full border border-[var(--background-modifier-border)]/60 bg-[var(--background-primary)]/40 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--text-faint)]" },
           "Days",
           -1
           /* CACHED */
         )),
         createBaseVNode(
           "b",
-          _hoisted_52,
+          _hoisted_53,
           toDisplayString($setup.aiDays),
           1
           /* TEXT */
@@ -39337,7 +40922,7 @@ function render4(_ctx, _cache, $props, $setup, $data, $options) {
 }
 
 // src/components/DataPanel.vue
-DataPanel_default.render = render4;
+DataPanel_default.render = render5;
 DataPanel_default.__file = "src/components/DataPanel.vue";
 var DataPanel_default2 = DataPanel_default;
 
@@ -39352,7 +40937,6 @@ var PromptLine_default = /* @__PURE__ */ defineComponent({
     __expose();
     const isInputFocused = ref(false);
     const promptStore = usePromptStore();
-    const props = __props;
     const isSearchActive = ref(false);
     const searchQuery = ref("");
     const searchInputRef = ref(null);
@@ -39370,7 +40954,7 @@ var PromptLine_default = /* @__PURE__ */ defineComponent({
       const day = date2.getDate().toString().padStart(2, "0");
       return `${year}/${month}/${day}`;
     });
-    let selectedPromptStats = computed2(() => {
+    const selectedPromptStats = computed2(() => {
       const promptStats = promptStore.promptStats;
       return promptStats[promptStore.selectedDate];
     });
@@ -39391,15 +40975,9 @@ var PromptLine_default = /* @__PURE__ */ defineComponent({
           });
         }
       } else {
-        if (selectedPromptStats.value && selectedPromptStats.value.prompt_content) {
-          content = [...selectedPromptStats.value.prompt_content];
-        }
+        content = selectedPromptStats.value?.prompt_content ? [...selectedPromptStats.value.prompt_content] : [];
       }
-      return content.sort((a4, b) => {
-        const timeA = Number(a4.id_timestamp);
-        const timeB = Number(b.id_timestamp);
-        return timeB - timeA;
-      });
+      return content.sort((a4, b) => Number(b.id_timestamp) - Number(a4.id_timestamp));
     });
     const toggleSearch = () => {
       if (isSearchActive.value) {
@@ -39422,26 +41000,32 @@ var PromptLine_default = /* @__PURE__ */ defineComponent({
         isSearchActive.value = false;
       }
     };
-    const formatTime = (timestamp) => {
+    const formatTime = (timestamp, forceFull = false) => {
       try {
         const date2 = !isNaN(Number(timestamp)) ? new Date(Number(timestamp)) : new Date(timestamp);
         if (isNaN(date2.getTime())) {
           return "\u65E0\u6548\u65F6\u95F4";
         }
-        if (searchQuery.value.trim()) {
+        if (forceFull || searchQuery.value.trim()) {
           const year = date2.getFullYear();
           const month = (date2.getMonth() + 1).toString().padStart(2, "0");
           const day = date2.getDate().toString().padStart(2, "0");
           const time2 = date2.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
           return `${year}/${month}/${day} ${time2}`;
         }
-        return date2.toLocaleTimeString();
+        return date2.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       } catch (error) {
         return "\u65E0\u6548\u65F6\u95F4";
       }
     };
     const clickItem = (item) => {
       promptStore.updateHistoryCard(item);
+    };
+    const clickSourceSelection = (item) => {
+      if (!item.source_selection) {
+        return;
+      }
+      void promptStore.findAndSelectPromptBySourceSelection(item.source_selection, item.source_conversation_id, item.id_timestamp);
     };
     const copyLink = (item) => {
       let linkText = "AI Chat";
@@ -39463,24 +41047,21 @@ var PromptLine_default = /* @__PURE__ */ defineComponent({
         window.getSelection()?.removeAllRanges();
       }
     };
-    const __returned__ = { isInputFocused, promptStore, props, isSearchActive, searchQuery, searchInputRef, selectedDate, get selectedPromptStats() {
-      return selectedPromptStats;
-    }, set selectedPromptStats(v2) {
-      selectedPromptStats = v2;
-    }, sortedPromptContent, toggleSearch, closeSearch, handleBlur, formatTime, clickItem, copyLink, clearSelection };
+    const __returned__ = { isInputFocused, promptStore, isSearchActive, searchQuery, searchInputRef, selectedDate, selectedPromptStats, sortedPromptContent, toggleSearch, closeSearch, handleBlur, formatTime, clickItem, clickSourceSelection, copyLink, clearSelection };
     Object.defineProperty(__returned__, "__isScriptSetup", { enumerable: false, value: true });
     return __returned__;
   }
 });
 
 // sfc-template:/Users/mali/Desktop/Projects/dev-vault/.obsidian/plugins/deepseek-ai-assistant/src/components/PromptLine.vue?type=template
-var _hoisted_18 = { class: "flex-none px-4 pt-2 pb-2" };
-var _hoisted_23 = { class: "flex items-center justify-between h-8" };
-var _hoisted_33 = {
+var _hoisted_113 = { class: "flex-none px-4 pt-2 pb-2" };
+var _hoisted_26 = { class: "flex items-center gap-2 h-8" };
+var _hoisted_34 = {
   key: 0,
-  class: "font-sans text-xl font-bold text-[var(--text-normal)] select-none truncate ml-1"
+  class: "ml-1 flex flex-1 items-center gap-1 overflow-hidden select-none"
 };
-var _hoisted_43 = {
+var _hoisted_44 = { class: "truncate rounded-full border border-[var(--background-modifier-border)]px-2.5 py-1 text-[11px] font-medium text-[var(--text-normal)]" };
+var _hoisted_54 = {
   key: 0,
   width: "16",
   height: "16",
@@ -39491,7 +41072,7 @@ var _hoisted_43 = {
   "stroke-linecap": "round",
   "stroke-linejoin": "round"
 };
-var _hoisted_53 = {
+var _hoisted_63 = {
   key: 1,
   width: "16",
   height: "16",
@@ -39502,79 +41083,81 @@ var _hoisted_53 = {
   "stroke-linecap": "round",
   "stroke-linejoin": "round"
 };
-var _hoisted_62 = { class: "flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10" };
-var _hoisted_72 = { class: "pl-2" };
-var _hoisted_82 = { class: "relative ml-2 space-y-6 pb-2" };
-var _hoisted_92 = {
+var _hoisted_73 = { class: "flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10" };
+var _hoisted_83 = { class: "pl-2" };
+var _hoisted_93 = { class: "relative ml-2 space-y-6 pb-2" };
+var _hoisted_103 = {
   key: 0,
   class: "pl-6 text-sm text-[var(--text-muted)] italic"
 };
-var _hoisted_102 = {
+var _hoisted_114 = {
   key: 0,
   class: "absolute left-0 top-3 h-[calc(100%+24px)] w-[2px] bg-[var(--background-modifier-border)]"
 };
-var _hoisted_112 = { class: "flex justify-between items-center mb-2" };
-var _hoisted_123 = { class: "font-sans text-xs text-[var(--text-muted)] select-none group-hover:text-[#007AFF] transition-colors duration-200" };
-var _hoisted_132 = ["onClick"];
-var _hoisted_142 = ["onClick"];
-var _hoisted_152 = { class: "font-sans text-[13px] leading-relaxed text-[var(--text-normal)] line-clamp-3 group-hover:line-clamp-none overflow-hidden select-text transition-all duration-300" };
-function render5(_ctx, _cache, $props, $setup, $data, $options) {
+var _hoisted_124 = { class: "flex justify-between items-center mb-2" };
+var _hoisted_133 = { class: "font-sans text-xs text-[var(--text-muted)] select-none group-hover:text-[#007AFF] transition-colors duration-200" };
+var _hoisted_143 = ["onClick"];
+var _hoisted_153 = ["onClick"];
+var _hoisted_163 = { class: "font-sans text-[13px] leading-relaxed text-[var(--text-normal)] line-clamp-3 group-hover:line-clamp-none overflow-hidden select-text transition-all duration-300" };
+var _hoisted_172 = ["onClick"];
+var _hoisted_182 = { class: "text-xs leading-relaxed text-[var(--text-muted)] line-clamp-3 group-hover:line-clamp-none overflow-hidden transition-all duration-300" };
+function render6(_ctx, _cache, $props, $setup, $data, $options) {
   return openBlock(), createElementBlock("div", {
     class: "flex flex-col h-full bg-transparent overflow-hidden",
     onClick: $setup.clearSelection
   }, [
-    createCommentVNode(" Header with Date and Search (Fixed) "),
-    createBaseVNode("div", _hoisted_18, [
-      createBaseVNode("div", _hoisted_23, [
-        createCommentVNode(" Date Title "),
-        !$setup.isSearchActive ? (openBlock(), createElementBlock(
-          "h3",
-          _hoisted_33,
-          toDisplayString($setup.selectedDate),
-          1
-          /* TEXT */
-        )) : (openBlock(), createElementBlock(
-          Fragment,
-          { key: 1 },
+    createBaseVNode("div", _hoisted_113, [
+      createBaseVNode("div", _hoisted_26, [
+        !$setup.isSearchActive ? (openBlock(), createElementBlock("div", _hoisted_34, [
+          _cache[2] || (_cache[2] = createBaseVNode(
+            "span",
+            { class: "inline-flex items-center rounded-full bg-[var(--background-modifier-hover)] px-3 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]" },
+            " Date ",
+            -1
+            /* CACHED */
+          )),
+          createCommentVNode(" \u201C>\u201D\u7B26\u53F7 "),
+          createCommentVNode(' <svg class="h-3 w-3 shrink-0 text-[var(--text-faint)]" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">\n            <path d="M6 3.5L10.5 8L6 12.5"></path>\n          </svg> '),
+          createBaseVNode(
+            "span",
+            _hoisted_44,
+            toDisplayString($setup.selectedDate),
+            1
+            /* TEXT */
+          )
+        ])) : (openBlock(), createElementBlock(
+          "div",
+          {
+            key: 1,
+            class: "flex-1 flex items-center bg-[var(--background-modifier-form-field)] rounded-md px-2 py-1 animate-in fade-in slide-in-from-right-2 duration-200 transition-all",
+            style: normalizeStyle({
+              border: $setup.isInputFocused ? "1px solid #007AFF" : "1px solid var(--background-modifier-border)",
+              boxShadow: $setup.isInputFocused ? "0 0 0 1px #007AFF" : "none"
+            })
+          },
           [
-            createCommentVNode(" Search Input "),
-            createBaseVNode(
-              "div",
+            withDirectives(createBaseVNode(
+              "input",
               {
-                class: "flex-1 flex items-center bg-[var(--background-modifier-form-field)] rounded-md px-2 py-1 mr-2 animate-in fade-in slide-in-from-right-2 duration-200 transition-all",
-                style: normalizeStyle({
-                  border: $setup.isInputFocused ? "1px solid #007AFF" : "1px solid var(--background-modifier-border)",
-                  boxShadow: $setup.isInputFocused ? "0 0 0 1px #007AFF" : "none"
-                })
+                ref: "searchInputRef",
+                "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => $setup.searchQuery = $event),
+                type: "text",
+                class: "w-full bg-transparent border-none p-0 text-sm text-[var(--text-normal)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-0",
+                placeholder: "Search prompts...",
+                onKeydown: withKeys($setup.closeSearch, ["esc"]),
+                onBlur: $setup.handleBlur,
+                onFocus: _cache[1] || (_cache[1] = ($event) => $setup.isInputFocused = true)
               },
-              [
-                withDirectives(createBaseVNode(
-                  "input",
-                  {
-                    ref: "searchInputRef",
-                    "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => $setup.searchQuery = $event),
-                    type: "text",
-                    class: "w-full bg-transparent border-none p-0 text-sm text-[var(--text-normal)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-0",
-                    placeholder: "Search prompts...",
-                    onKeydown: withKeys($setup.closeSearch, ["esc"]),
-                    onBlur: $setup.handleBlur,
-                    onFocus: _cache[1] || (_cache[1] = ($event) => $setup.isInputFocused = true)
-                  },
-                  null,
-                  544
-                  /* NEED_HYDRATION, NEED_PATCH */
-                ), [
-                  [vModelText, $setup.searchQuery]
-                ])
-              ],
-              4
-              /* STYLE */
-            )
+              null,
+              544
+              /* NEED_HYDRATION, NEED_PATCH */
+            ), [
+              [vModelText, $setup.searchQuery]
+            ])
           ],
-          2112
-          /* STABLE_FRAGMENT, DEV_ROOT_FRAGMENT */
+          4
+          /* STYLE */
         )),
-        createCommentVNode(" Search Toggle Button "),
         createBaseVNode(
           "button",
           {
@@ -39583,7 +41166,7 @@ function render5(_ctx, _cache, $props, $setup, $data, $options) {
             title: "Search"
           },
           [
-            !$setup.isSearchActive ? (openBlock(), createElementBlock("svg", _hoisted_43, [..._cache[2] || (_cache[2] = [
+            !$setup.isSearchActive ? (openBlock(), createElementBlock("svg", _hoisted_54, [..._cache[3] || (_cache[3] = [
               createBaseVNode(
                 "circle",
                 {
@@ -39607,7 +41190,7 @@ function render5(_ctx, _cache, $props, $setup, $data, $options) {
                 -1
                 /* CACHED */
               )
-            ])])) : (openBlock(), createElementBlock("svg", _hoisted_53, [..._cache[3] || (_cache[3] = [
+            ])])) : (openBlock(), createElementBlock("svg", _hoisted_63, [..._cache[4] || (_cache[4] = [
               createBaseVNode(
                 "line",
                 {
@@ -39639,12 +41222,10 @@ function render5(_ctx, _cache, $props, $setup, $data, $options) {
         )
       ])
     ]),
-    createCommentVNode(" Content (Scrollable) "),
-    createBaseVNode("div", _hoisted_62, [
-      createBaseVNode("div", _hoisted_72, [
-        createCommentVNode(" Timeline Container "),
-        createBaseVNode("div", _hoisted_82, [
-          $setup.sortedPromptContent.length === 0 ? (openBlock(), createElementBlock("div", _hoisted_92, " No prompts found. ")) : createCommentVNode("v-if", true),
+    createBaseVNode("div", _hoisted_73, [
+      createBaseVNode("div", _hoisted_83, [
+        createBaseVNode("div", _hoisted_93, [
+          $setup.sortedPromptContent.length === 0 ? (openBlock(), createElementBlock("div", _hoisted_103, " No prompts found. ")) : createCommentVNode("v-if", true),
           (openBlock(true), createElementBlock(
             Fragment,
             null,
@@ -39653,31 +41234,27 @@ function render5(_ctx, _cache, $props, $setup, $data, $options) {
                 key: item.id_timestamp,
                 class: "relative pl-6 group"
               }, [
-                createCommentVNode(" Vertical Line (Connects to next item) "),
-                index3 !== $setup.sortedPromptContent.length - 1 ? (openBlock(), createElementBlock("div", _hoisted_102)) : createCommentVNode("v-if", true),
-                createCommentVNode(" Timeline Dot "),
-                _cache[5] || (_cache[5] = createBaseVNode(
+                index3 !== $setup.sortedPromptContent.length - 1 ? (openBlock(), createElementBlock("div", _hoisted_114)) : createCommentVNode("v-if", true),
+                _cache[6] || (_cache[6] = createBaseVNode(
                   "div",
                   { class: "absolute -left-[4.5px] top-3 w-[11px] h-[11px] rounded-full bg-[#007AFF]/50 border-2 border-[#007AFF]/50 group-hover:scale-125 group-hover:shadow-[0_0_0_3px_rgba(0,122,255,0.2)] transition-all duration-200 z-10" },
                   null,
                   -1
                   /* CACHED */
                 )),
-                createCommentVNode(" Timestamp "),
-                createBaseVNode("div", _hoisted_112, [
+                createBaseVNode("div", _hoisted_124, [
                   createBaseVNode(
                     "div",
-                    _hoisted_123,
+                    _hoisted_133,
                     toDisplayString($setup.formatTime(item.id_timestamp)),
                     1
                     /* TEXT */
                   ),
-                  createCommentVNode(" Copy Link Button (Visible on Hover) "),
                   createBaseVNode("button", {
                     onClick: withModifiers(($event) => $setup.copyLink(item), ["stop"]),
                     class: "opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[var(--background-modifier-hover)] text-[var(--text-muted)] hover:text-[var(--text-normal)] transition-all duration-200",
                     title: "Copy Link to Note"
-                  }, [..._cache[4] || (_cache[4] = [
+                  }, [..._cache[5] || (_cache[5] = [
                     createBaseVNode(
                       "svg",
                       {
@@ -39697,21 +41274,34 @@ function render5(_ctx, _cache, $props, $setup, $data, $options) {
                       -1
                       /* CACHED */
                     )
-                  ])], 8, _hoisted_132)
+                  ])], 8, _hoisted_143)
                 ]),
-                createCommentVNode(" Card "),
                 createBaseVNode("div", {
                   class: "prompt-content bg-[var(--background-primary)] rounded-lg p-3 cursor-pointer transition-all duration-300 border border-[var(--background-modifier-border)] select-text group-hover:border-apple-blue group-hover:shadow-md group-active:border-apple-blue group-active:shadow-lg relative",
                   onClick: ($event) => $setup.clickItem(item)
                 }, [
                   createBaseVNode(
                     "div",
-                    _hoisted_152,
+                    _hoisted_163,
                     toDisplayString(item.prompt),
                     1
                     /* TEXT */
-                  )
-                ], 8, _hoisted_142)
+                  ),
+                  item.source_selection ? (openBlock(), createElementBlock("div", {
+                    key: 0,
+                    class: "mt-3 rounded-lg border border-[var(--background-modifier-border)] bg-[var(--background-secondary)] px-3 py-2 transition-colors hover:border-apple-blue hover:bg-[var(--background-modifier-hover)]",
+                    onClick: withModifiers(($event) => $setup.clickSourceSelection(item), ["stop"])
+                  }, [
+                    createCommentVNode(' <div class="mb-1 text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">\n                  Selected excerpt\n                </div> '),
+                    createBaseVNode(
+                      "div",
+                      _hoisted_182,
+                      toDisplayString(item.source_selection),
+                      1
+                      /* TEXT */
+                    )
+                  ], 8, _hoisted_172)) : createCommentVNode("v-if", true)
+                ], 8, _hoisted_153)
               ]);
             }),
             128
@@ -39724,11 +41314,12 @@ function render5(_ctx, _cache, $props, $setup, $data, $options) {
 }
 
 // src/components/PromptLine.vue
-PromptLine_default.render = render5;
+PromptLine_default.render = render6;
 PromptLine_default.__file = "src/components/PromptLine.vue";
 var PromptLine_default2 = PromptLine_default;
 
 // sfc-script:/Users/mali/Desktop/Projects/dev-vault/.obsidian/plugins/deepseek-ai-assistant/src/components/MainTemplate.vue?type=script
+var collapsedAsideWidth = 0;
 var MainTemplate_default = /* @__PURE__ */ defineComponent({
   __name: "MainTemplate",
   props: {
@@ -39738,9 +41329,25 @@ var MainTemplate_default = /* @__PURE__ */ defineComponent({
     __expose();
     const props = __props;
     const pluginStore = usePluginStore();
+    const promptStore = usePromptStore();
     const { isSidebarOpen } = storeToRefs(pluginStore);
+    const isDashboardCollapsed = ref(false);
+    const overlayRootRef = ref(null);
+    const selectedPromptLabel = computed2(() => {
+      const prompt = promptStore.historyCard?.prompt?.replace(/\s+/g, " ").trim();
+      if (!prompt) {
+        return "";
+      }
+      return prompt.length > 60 ? `${prompt.slice(0, 60)}...` : prompt;
+    });
     const toggleSidebar = () => {
       pluginStore.toggleSidebar();
+    };
+    const toggleDashboardSection = () => {
+      isDashboardCollapsed.value = !isDashboardCollapsed.value;
+    };
+    const clearCurrentConversation = () => {
+      promptStore.updateHistoryCard(null);
     };
     const asideWidth = ref(260);
     const isDragging = ref(false);
@@ -39772,7 +41379,7 @@ var MainTemplate_default = /* @__PURE__ */ defineComponent({
       window.removeEventListener("mouseup", stopDrag);
       document.body.style.cursor = "";
     });
-    const __returned__ = { props, pluginStore, isSidebarOpen, toggleSidebar, asideWidth, isDragging, get startX() {
+    const __returned__ = { props, pluginStore, promptStore, isSidebarOpen, isDashboardCollapsed, overlayRootRef, selectedPromptLabel, toggleSidebar, toggleDashboardSection, clearCurrentConversation, asideWidth, collapsedAsideWidth, isDragging, get startX() {
       return startX;
     }, set startX(v2) {
       startX = v2;
@@ -39787,104 +41394,304 @@ var MainTemplate_default = /* @__PURE__ */ defineComponent({
 });
 
 // sfc-template:/Users/mali/Desktop/Projects/dev-vault/.obsidian/plugins/deepseek-ai-assistant/src/components/MainTemplate.vue?type=template
-var _hoisted_19 = { class: "absolute inset-0 flex w-full h-full overflow-hidden bg-[var(--background-primary)] text-[var(--text-normal)]" };
-var _hoisted_24 = { class: "flex-none w-full border-b border-[var(--apple-border)] pb-0" };
-var _hoisted_34 = { class: "flex-1 w-full min-h-0 overflow-hidden" };
-var _hoisted_44 = { class: "flex-1 h-full overflow-hidden relative bg-[var(--background-secondary)]" };
-var _hoisted_54 = ["title"];
-function render6(_ctx, _cache, $props, $setup, $data, $options) {
-  return openBlock(), createElementBlock("div", _hoisted_19, [
-    createCommentVNode(" \u4FA7\u8FB9\u680F "),
-    withDirectives(createBaseVNode(
-      "div",
-      {
-        class: "relative flex flex-col flex-none h-full bg-[var(--background-secondary)] border-r border-[var(--apple-border)]",
-        style: normalizeStyle({ width: $setup.asideWidth + "px", flexDirection: "column" })
-      },
-      [
-        createCommentVNode(" Header/Dashboard \u533A\u57DF\uFF1A\u56FA\u5B9A\u9AD8\u5EA6\uFF0C\u5E26\u5E95\u90E8\u5206\u5272\u7EBF "),
-        createBaseVNode("div", _hoisted_24, [
-          createVNode($setup["DataPanel"], { plugin: $props.plugin }, null, 8, ["plugin"]),
-          createVNode($setup["HeatMap"])
-        ]),
-        createCommentVNode(" List \u533A\u57DF\uFF1A\u81EA\u9002\u5E94\u9AD8\u5EA6\uFF0C\u72EC\u7ACB\u6EDA\u52A8 "),
-        createBaseVNode("div", _hoisted_34, [
-          createVNode($setup["PromptLine"], { plugin: $props.plugin }, null, 8, ["plugin"])
-        ]),
-        createCommentVNode(" Footer \u533A\u57DF (\u53EF\u9009)\uFF1A\u5982\u8BBE\u7F6E\u6309\u94AE\u7B49\uFF0C\u56FA\u5B9A\u5728\u5E95\u90E8 "),
-        createCommentVNode(' <div class="flex-none p-3 border-t border-[var(--apple-border)]">\n                <button>Settings</button>\n            </div> '),
-        createCommentVNode(" \u62D6\u62FD\u624B\u67C4 "),
-        createBaseVNode(
-          "div",
-          {
-            class: "absolute right-0 top-0 w-[6px] h-full cursor-col-resize z-50 hover:bg-apple-blue/10 active:bg-apple-blue/20 transition-colors duration-200 flex justify-end group",
-            onMousedown: withModifiers($setup.startDrag, ["prevent"])
-          },
-          [..._cache[0] || (_cache[0] = [
+var _hoisted_115 = {
+  ref: "overlayRootRef",
+  "data-follow-up-overlay-root": "",
+  class: "absolute inset-0 flex w-full h-full overflow-hidden bg-[var(--background-primary)] text-[var(--text-normal)]"
+};
+var _hoisted_27 = {
+  key: 0,
+  class: "relative flex h-full w-full flex-col",
+  style: { flexDirection: "column" }
+};
+var _hoisted_35 = { class: "flex h-10 items-center justify-between border-b border-[var(--apple-border)] px-3" };
+var _hoisted_45 = { class: "inline-flex items-center gap-1 overflow-hidden select-none" };
+var _hoisted_55 = { class: "flex-none w-full border-b border-[var(--apple-border)] pb-0" };
+var _hoisted_64 = { class: "flex-1 w-full min-h-0 overflow-hidden" };
+var _hoisted_74 = { class: "flex h-full flex-1 flex-col overflow-hidden bg-[var(--background-secondary)]" };
+var _hoisted_84 = { class: "flex h-11 flex-none items-center justify-between border-b border-[var(--apple-border)] px-4" };
+var _hoisted_94 = { class: "flex min-w-0 items-center gap-2" };
+var _hoisted_104 = { class: "inline-flex min-w-0 items-center gap-1 overflow-hidden select-none" };
+var _hoisted_116 = {
+  key: 0,
+  class: "group inline-flex min-w-0 items-center gap-1 overflow-hidden"
+};
+var _hoisted_125 = ["title"];
+var _hoisted_134 = { class: "min-h-0 flex-1 overflow-hidden" };
+function render7(_ctx, _cache, $props, $setup, $data, $options) {
+  return openBlock(), createElementBlock(
+    "div",
+    _hoisted_115,
+    [
+      createCommentVNode(" \u5DE6\u4FA7\u8FB9\u680F "),
+      createBaseVNode(
+        "div",
+        {
+          class: normalizeClass(["relative flex flex-none h-full overflow-hidden bg-[var(--background-secondary)]", $setup.isSidebarOpen ? "border-r border-[var(--apple-border)]" : "border-r-0"]),
+          style: normalizeStyle({ width: $setup.isSidebarOpen ? $setup.asideWidth + "px" : $setup.collapsedAsideWidth + "px" })
+        },
+        [
+          $setup.isSidebarOpen ? (openBlock(), createElementBlock("div", _hoisted_27, [
+            createCommentVNode(" \u4FA7\u8FB9\u680F\u9876\u90E8\u9762\u5305\u5C51\u5BFC\u822A\u680F\u533A "),
+            createBaseVNode("div", _hoisted_35, [
+              createBaseVNode("div", _hoisted_45, [
+                _cache[1] || (_cache[1] = createBaseVNode(
+                  "span",
+                  { class: "inline-flex items-center rounded-full bg-[var(--background-modifier-hover)] px-2 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]" },
+                  " Overview ",
+                  -1
+                  /* CACHED */
+                )),
+                createBaseVNode("button", {
+                  onClick: $setup.toggleDashboardSection,
+                  type: "button",
+                  class: "inline-flex appearance-none items-center justify-center rounded-md border-0 bg-transparent p-2 text-[var(--text-muted)] shadow-none outline-none transition-all duration-150 hover:bg-[var(--background-modifier-hover)] hover:text-[var(--text-normal)] hover:shadow-sm active:scale-95 focus:outline-none focus:ring-0",
+                  style: { "border": "none", "box-shadow": "none" },
+                  title: "Toggle Overview"
+                }, [
+                  (openBlock(), createElementBlock(
+                    "svg",
+                    {
+                      class: normalizeClass(["h-3 w-3 shrink-0 text-[var(--text-faint)] transition-transform duration-150", $setup.isDashboardCollapsed ? "-rotate-90" : "rotate-90"]),
+                      viewBox: "0 0 16 16",
+                      fill: "none",
+                      stroke: "currentColor",
+                      "stroke-width": "1.75",
+                      "stroke-linecap": "round",
+                      "stroke-linejoin": "round",
+                      "aria-hidden": "true"
+                    },
+                    [..._cache[0] || (_cache[0] = [
+                      createBaseVNode(
+                        "path",
+                        { d: "M6 3.5L10.5 8L6 12.5" },
+                        null,
+                        -1
+                        /* CACHED */
+                      )
+                    ])],
+                    2
+                    /* CLASS */
+                  ))
+                ]),
+                createCommentVNode(' <span class="truncate text-xs font-medium text-[var(--text-muted)]">\n                            Overview\n                        </span> ')
+              ]),
+              createCommentVNode('class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--background-modifier-hover)] hover:text-[var(--text-normal)]" '),
+              createBaseVNode("button", {
+                onClick: $setup.toggleSidebar,
+                type: "button",
+                class: "inline-flex appearance-none items-center justify-center rounded-md border-0 bg-transparent p-2 text-[var(--text-muted)] shadow-none outline-none transition-all duration-150 hover:bg-[var(--background-modifier-hover)] hover:text-[var(--text-normal)] hover:shadow-sm active:scale-95 focus:outline-none focus:ring-0",
+                style: { "border": "none", "box-shadow": "none" },
+                title: "Close Sidebar"
+              }, [..._cache[2] || (_cache[2] = [
+                createBaseVNode(
+                  "svg",
+                  {
+                    width: "16",
+                    height: "16",
+                    viewBox: "0 0 24 24",
+                    fill: "none",
+                    stroke: "currentColor",
+                    "stroke-width": "2",
+                    "stroke-linecap": "round",
+                    "stroke-linejoin": "round",
+                    "aria-hidden": "true"
+                  },
+                  [
+                    createBaseVNode("rect", {
+                      x: "3",
+                      y: "3",
+                      width: "18",
+                      height: "18",
+                      rx: "2",
+                      ry: "2"
+                    }),
+                    createBaseVNode("line", {
+                      x1: "9",
+                      y1: "3",
+                      x2: "9",
+                      y2: "21"
+                    })
+                  ],
+                  -1
+                  /* CACHED */
+                )
+              ])])
+            ]),
+            createCommentVNode(" Header/Dashboard \u533A\u57DF\uFF1A\u56FA\u5B9A\u9AD8\u5EA6\uFF0C\u5E26\u5E95\u90E8\u5206\u5272\u7EBF "),
+            withDirectives(createBaseVNode(
+              "div",
+              _hoisted_55,
+              [
+                createVNode($setup["DataPanel"], { plugin: $props.plugin }, null, 8, ["plugin"]),
+                createVNode($setup["HeatMap"])
+              ],
+              512
+              /* NEED_PATCH */
+            ), [
+              [vShow, !$setup.isDashboardCollapsed]
+            ]),
+            createCommentVNode(" List \u533A\u57DF\uFF1A\u81EA\u9002\u5E94\u9AD8\u5EA6\uFF0C\u72EC\u7ACB\u6EDA\u52A8 "),
+            createBaseVNode("div", _hoisted_64, [
+              createVNode($setup["PromptLine"], { plugin: $props.plugin }, null, 8, ["plugin"])
+            ]),
+            createCommentVNode(" Footer \u533A\u57DF (\u53EF\u9009)\uFF1A\u5982\u8BBE\u7F6E\u6309\u94AE\u7B49\uFF0C\u56FA\u5B9A\u5728\u5E95\u90E8 "),
+            createCommentVNode(' <div class="flex-none p-3 border-t border-[var(--apple-border)]">\n                    <button>Settings</button>\n                </div> '),
+            createCommentVNode(" \u62D6\u62FD\u624B\u67C4 "),
             createBaseVNode(
               "div",
-              { class: "w-[2px] h-full bg-transparent group-hover:bg-apple-blue group-active:bg-apple-blue transition-colors duration-200" },
-              null,
-              -1
-              /* CACHED */
+              {
+                class: "absolute right-0 top-0 z-50 flex h-full w-[6px] cursor-col-resize justify-end transition-colors duration-200 hover:bg-apple-blue/10 active:bg-apple-blue/20 group",
+                onMousedown: withModifiers($setup.startDrag, ["prevent"])
+              },
+              [..._cache[3] || (_cache[3] = [
+                createBaseVNode(
+                  "div",
+                  { class: "h-full w-[2px] bg-transparent transition-colors duration-200 group-hover:bg-apple-blue group-active:bg-apple-blue" },
+                  null,
+                  -1
+                  /* CACHED */
+                )
+              ])],
+              32
+              /* NEED_HYDRATION */
             )
-          ])],
-          32
-          /* NEED_HYDRATION */
-        )
-      ],
-      4
-      /* STYLE */
-    ), [
-      [vShow, $setup.isSidebarOpen]
-    ]),
-    createCommentVNode(" \u4E3B\u5185\u5BB9\u533A "),
-    createBaseVNode("div", _hoisted_44, [
-      createCommentVNode(" Sidebar Toggle Button "),
-      createBaseVNode("button", {
-        onClick: $setup.toggleSidebar,
-        class: "absolute top-3 left-3 z-20 p-2 rounded-lg text-[var(--text-muted)] hover:bg-[var(--background-modifier-hover)] hover:text-[var(--text-normal)] transition-colors",
-        title: $setup.isSidebarOpen ? "Close Sidebar" : "Open Sidebar"
-      }, [..._cache[1] || (_cache[1] = [
-        createBaseVNode(
-          "svg",
-          {
-            width: "20",
-            height: "20",
-            viewBox: "0 0 24 24",
-            fill: "none",
-            stroke: "currentColor",
-            "stroke-width": "2",
-            "stroke-linecap": "round",
-            "stroke-linejoin": "round"
-          },
-          [
-            createBaseVNode("rect", {
-              x: "3",
-              y: "3",
-              width: "18",
-              height: "18",
-              rx: "2",
-              ry: "2"
-            }),
-            createBaseVNode("line", {
-              x1: "9",
-              y1: "3",
-              x2: "9",
-              y2: "21"
-            })
-          ],
-          -1
-          /* CACHED */
-        )
-      ])], 8, _hoisted_54),
-      createVNode($setup["AICard"], { plugin: $props.plugin }, null, 8, ["plugin"])
-    ])
-  ]);
+          ])) : createCommentVNode("v-if", true)
+        ],
+        6
+        /* CLASS, STYLE */
+      ),
+      createCommentVNode(" \u4E3B\u5185\u5BB9\u533A "),
+      createBaseVNode("div", _hoisted_74, [
+        createBaseVNode("div", _hoisted_84, [
+          createBaseVNode("div", _hoisted_94, [
+            !$setup.isSidebarOpen ? (openBlock(), createElementBlock("button", {
+              key: 0,
+              onClick: $setup.toggleSidebar,
+              type: "button",
+              class: "inline-flex appearance-none items-center justify-center rounded-md border-0 bg-transparent p-2 text-[var(--text-muted)] shadow-none outline-none transition-all duration-150 hover:bg-[var(--background-modifier-hover)] hover:text-[var(--text-normal)] hover:shadow-sm active:scale-95 focus:outline-none focus:ring-0",
+              style: { "border": "none", "box-shadow": "none" },
+              title: "Open Sidebar"
+            }, [..._cache[4] || (_cache[4] = [
+              createBaseVNode(
+                "svg",
+                {
+                  width: "16",
+                  height: "16",
+                  viewBox: "0 0 24 24",
+                  fill: "none",
+                  stroke: "currentColor",
+                  "stroke-width": "2",
+                  "stroke-linecap": "round",
+                  "stroke-linejoin": "round",
+                  "aria-hidden": "true"
+                },
+                [
+                  createBaseVNode("rect", {
+                    x: "3",
+                    y: "3",
+                    width: "18",
+                    height: "18",
+                    rx: "2",
+                    ry: "2"
+                  }),
+                  createBaseVNode("line", {
+                    x1: "9",
+                    y1: "3",
+                    x2: "9",
+                    y2: "21"
+                  })
+                ],
+                -1
+                /* CACHED */
+              )
+            ])])) : createCommentVNode("v-if", true),
+            createBaseVNode("div", _hoisted_104, [
+              _cache[6] || (_cache[6] = createBaseVNode(
+                "span",
+                { class: "truncate text-xs font-medium text-[var(--text-muted)]" },
+                " Conversation ",
+                -1
+                /* CACHED */
+              )),
+              _cache[7] || (_cache[7] = createBaseVNode(
+                "svg",
+                {
+                  class: "h-3 w-3 shrink-0 text-[var(--text-faint)]",
+                  viewBox: "0 0 16 16",
+                  fill: "none",
+                  stroke: "currentColor",
+                  "stroke-width": "1.75",
+                  "stroke-linecap": "round",
+                  "stroke-linejoin": "round",
+                  "aria-hidden": "true"
+                },
+                [
+                  createBaseVNode("path", { d: "M6 3.5L10.5 8L6 12.5" })
+                ],
+                -1
+                /* CACHED */
+              )),
+              $setup.selectedPromptLabel ? (openBlock(), createElementBlock("div", _hoisted_116, [
+                createBaseVNode("span", {
+                  class: "truncate text-xs font-medium text-[var(--text-normal)] cursor-default",
+                  title: $setup.selectedPromptLabel,
+                  onClick: $setup.clearCurrentConversation
+                }, toDisplayString($setup.selectedPromptLabel), 9, _hoisted_125),
+                createBaseVNode("button", {
+                  type: "button",
+                  class: "inline-flex h-4 w-4 shrink-0 appearance-none items-center justify-center border-0 bg-transparent p-0 text-[var(--text-muted)] opacity-0 shadow-none outline-none transition-opacity duration-150 group-hover:opacity-100 focus:outline-none focus:ring-0",
+                  style: { "border": "none" },
+                  title: "Clear conversation",
+                  onClick: $setup.clearCurrentConversation
+                }, [..._cache[5] || (_cache[5] = [
+                  createBaseVNode(
+                    "div",
+                    { class: "flex h-4 w-4 items-center justify-center rounded-none transition-all duration-150 hover:bg-[var(--background-modifier-hover)] hover:text-[var(--text-normal)] hover:shadow-sm" },
+                    [
+                      createBaseVNode("svg", {
+                        class: "h-3 w-3",
+                        viewBox: "0 0 16 16",
+                        fill: "none",
+                        stroke: "currentColor",
+                        "stroke-width": "1.35",
+                        "stroke-linecap": "round",
+                        "aria-hidden": "true"
+                      }, [
+                        createBaseVNode("path", { d: "M4.5 4.5l7 7" }),
+                        createBaseVNode("path", { d: "M11.5 4.5l-7 7" })
+                      ])
+                    ],
+                    -1
+                    /* CACHED */
+                  )
+                ])])
+              ])) : createCommentVNode("v-if", true)
+            ])
+          ]),
+          _cache[8] || (_cache[8] = createBaseVNode(
+            "div",
+            { class: "text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-faint)]" },
+            " Workspace ",
+            -1
+            /* CACHED */
+          ))
+        ]),
+        createBaseVNode("div", _hoisted_134, [
+          createVNode($setup["AICard"], {
+            plugin: $props.plugin,
+            "overlay-target": $setup.overlayRootRef
+          }, null, 8, ["plugin", "overlay-target"])
+        ])
+      ])
+    ],
+    512
+    /* NEED_PATCH */
+  );
 }
 
 // src/components/MainTemplate.vue
-MainTemplate_default.render = render6;
+MainTemplate_default.render = render7;
 MainTemplate_default.__file = "src/components/MainTemplate.vue";
 var MainTemplate_default2 = MainTemplate_default;
 
@@ -39972,7 +41779,12 @@ var Plugin_Deepseek_AI_Assistant = class extends import_obsidian6.Plugin {
     }
   }
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const loadedData = await this.loadData();
+    const { settings, shouldSave } = this.migrateSettings(loadedData);
+    this.settings = settings;
+    if (shouldSave) {
+      await this.saveData(this.settings);
+    }
   }
   async saveSettings() {
     await this.saveData(this.settings);
@@ -39995,6 +41807,133 @@ var Plugin_Deepseek_AI_Assistant = class extends import_obsidian6.Plugin {
     } else {
       new import_obsidian6.Notice("\u65E0\u6CD5\u627E\u5230\u89C6\u56FE");
     }
+  }
+  migrateSettings(loadedData) {
+    const loaded = loadedData || {};
+    const models = this.migrateModels(loaded);
+    const promptStats = this.migratePromptStats(loaded, models);
+    const settings = { models, promptStats };
+    const allowedKeys = /* @__PURE__ */ new Set(["models", "promptStats"]);
+    const hasDeprecatedFields = Object.keys(loaded).some((key) => !allowedKeys.has(key));
+    return {
+      settings,
+      shouldSave: hasDeprecatedFields || Boolean(loaded.promptStatus) || !loaded.promptStats
+    };
+  }
+  migrateModels(loaded) {
+    const loadedModels = Array.isArray(loaded.models) ? loaded.models : null;
+    const legacyCustomModels = Array.isArray(loaded.customModels) ? loaded.customModels : null;
+    const sourceModels = loadedModels?.length ? loadedModels : legacyCustomModels?.length ? legacyCustomModels : DEFAULT_SETTINGS.models;
+    const legacyApiKey = typeof loaded.API_KEY === "string" ? loaded.API_KEY : "";
+    const legacyApiUrl = typeof loaded.API_URL === "string" ? loaded.API_URL : "";
+    return sourceModels.map((model, index3) => ({
+      id: String(model.id || model.uuid || model.name || model.modelId || model.model || `legacy-model-${index3}`),
+      name: String(model.name || model.modelId || model.model || `Legacy Model ${index3 + 1}`),
+      modelId: String(model.modelId || model.model || model.id || DEFAULT_SETTINGS.models[0].modelId),
+      apiKey: model.apiKey || model.api_key || legacyApiKey,
+      apiUrl: model.apiUrl || model.api_url || model.baseURL || model.baseUrl || legacyApiUrl || DEFAULT_SETTINGS.models[0].apiUrl,
+      providerUrl: model.providerUrl || model.provider_url || ""
+    }));
+  }
+  migratePromptStats(loaded, models) {
+    const promptStats = this.clonePromptStats(loaded.promptStats || loaded.promptStatus || {});
+    const existingIds = /* @__PURE__ */ new Set();
+    const existingContentKeys = /* @__PURE__ */ new Set();
+    Object.values(promptStats).forEach((dayStats) => {
+      const promptContent = Array.isArray(dayStats?.prompt_content) ? dayStats.prompt_content : [];
+      promptContent.forEach((item) => {
+        if (item.id_timestamp) {
+          existingIds.add(item.id_timestamp);
+        }
+        existingContentKeys.add(this.buildConversationContentKey(item.prompt, item.answer));
+      });
+    });
+    if (!Array.isArray(loaded.conversations)) {
+      return promptStats;
+    }
+    loaded.conversations.forEach((legacyConversation) => {
+      const messages = Array.isArray(legacyConversation.messages) ? legacyConversation.messages : [];
+      messages.forEach((message, index3) => {
+        if (message.role !== "user" || !message.content) {
+          return;
+        }
+        const assistantMessage = this.findNextAssistantMessage(messages, index3 + 1);
+        const prompt = message.content;
+        const answer = assistantMessage?.content || "";
+        const contentKey = this.buildConversationContentKey(prompt, answer);
+        if (existingContentKeys.has(contentKey)) {
+          return;
+        }
+        const timestamp = this.normalizeTimestamp(
+          assistantMessage?.timestamp || message.timestamp || legacyConversation.updatedAt || legacyConversation.createdAt
+        );
+        const idTimestamp = this.createUniqueTimestampId(timestamp, existingIds);
+        const dateKey = new Date(timestamp).toISOString().split("T")[0];
+        if (!promptStats[dateKey]) {
+          promptStats[dateKey] = { num: 0, prompt_content: [] };
+        }
+        promptStats[dateKey].prompt_content.push({
+          id_timestamp: idTimestamp,
+          prompt,
+          answer,
+          model: this.resolveModelValue(message.model || legacyConversation.model, models)
+        });
+        promptStats[dateKey].num = promptStats[dateKey].prompt_content.length;
+        existingContentKeys.add(contentKey);
+      });
+    });
+    return promptStats;
+  }
+  clonePromptStats(promptStats) {
+    const clonedStats = {};
+    Object.keys(promptStats || {}).forEach((date2) => {
+      const dayStats = promptStats[date2];
+      const promptContent = Array.isArray(dayStats?.prompt_content) ? dayStats.prompt_content : [];
+      clonedStats[date2] = {
+        num: promptContent.length,
+        prompt_content: promptContent.map((item) => ({ ...item }))
+      };
+    });
+    return clonedStats;
+  }
+  findNextAssistantMessage(messages, startIndex) {
+    for (let index3 = startIndex; index3 < messages.length; index3 += 1) {
+      const message = messages[index3];
+      if (message.role === "user") {
+        return null;
+      }
+      if (message.role === "assistant") {
+        return message;
+      }
+    }
+    return null;
+  }
+  normalizeTimestamp(timestamp) {
+    if (typeof timestamp === "number" && Number.isFinite(timestamp)) {
+      return timestamp > 1e11 ? timestamp : timestamp * 1e3;
+    }
+    return Date.now();
+  }
+  createUniqueTimestampId(timestamp, existingIds) {
+    let candidate = timestamp;
+    while (existingIds.has(String(candidate))) {
+      candidate += 1;
+    }
+    const id2 = String(candidate);
+    existingIds.add(id2);
+    return id2;
+  }
+  buildConversationContentKey(prompt = "", answer = "") {
+    return `${prompt.replace(/\s+/g, " ").trim()}
+---
+${answer.replace(/\s+/g, " ").trim()}`;
+  }
+  resolveModelValue(model, models) {
+    if (!model) {
+      return void 0;
+    }
+    const found = models.find((item) => item.id === model || item.modelId === model || item.name === model);
+    return found?.modelId || model;
   }
 };
 /*! Bundled license information:
